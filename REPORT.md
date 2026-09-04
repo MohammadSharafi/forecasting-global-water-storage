@@ -25,52 +25,61 @@ can see its own target. All numbers below are held-out.
 | | layout A | layout B | public LB |
 |---|---|---|---|
 | persistence | 0.757 | 0.687 | 0.886 |
-| **final stack** | **0.653** | **0.571** | **0.714** (v5-smooth; final stack pending) |
-| gain vs persistence | −13.5% | −16.3% | −19.4% |
+| previous final stack (4 Sep) | 0.652 | 0.578 | 0.714 (v5-smooth) |
+| **final ensemble (5 Sep)** | **0.636** | **0.550** | pending |
+| gain vs persistence | −16.0% | −20.0% | — |
 
 The gain transferred to the test period in full — it is larger there because 2015–2018
 (the 2015–16 El Niño) has bigger anomalies, where the model helps most (§4.1).
 
 ## 3. Model
 
-Two LightGBM models (open source), both predicting the **residual**
-`TWS(t+1) − TWS(last observed)`, averaged 50/50, then a light spatial smoothing of the
-predicted residual over the 8 neighbours (w = 0.7; +0.003 on both layouts).
+An ensemble of four model families, all predicting the **residual** `TWS(t+1) − TWS(last observed)`
+from the same 142 features, blended 0.7 (neural) / 0.3 (trees), then two light post-processing
+steps: spatial smoothing of the predicted change over the 8 neighbours (w = 0.7) and **trajectory
+smoothing** along the horizon within a block (each change is blended 0.35 with the mean of the
+changes predicted for the neighbouring horizons of the same cell and last-observed month; −0.004/−0.002).
+
+- **MLP** (PyTorch): 3 hidden layers (256-256-128, SiLU, dropout 0.3, weight decay 1e-3), a single
+  one-cycle epoch (~25 s on an Apple M1 GPU). It overfits cell identity from the second epoch on,
+  so it is deliberately under-trained; 7 seeds (2 without latitude/longitude) are averaged. Best single
+  model on both layouts (A 0.648, B 0.551).
+- **LightGBM / XGBoost / CatBoost** (3/3/2 seeds; 127 leaves or depth 8–9, 63-bin histograms,
+  learning rate 0.02–0.03, ~400–1000 rounds). A 0.646–0.650, B 0.566–0.576. Trees get 0.1 each: on
+  layout A the trees and the MLP are equally good and blend well; on layout B the MLP dominates.
 
 Inputs, all available at or before month t:
 
 - last observed TWS, its month, horizon, previous observation and slope; TWS lags 1/2/3/6/12
-  months before the last observation; 24-month trend and deviation from the 24-month mean
-- **Model A (v5)**: per-cell 2002–2015 climatology of target and last-observed month,
-  cell mean/std/lag-1 autocorrelation.  **Model B (v6)**: the same *recent-window*
-  statistics (60 months before the last observation: mean, monthly climatology, trend) with
-  the long-term anchors removed, plus training weights ramping toward recent years.
-  A and B differ on 11% of predictions by >0.1; their average beats either alone.
-- covariates at t (never masked): SPEI-1/3/6/12, soil moisture; the same at the last
-  observed month; their differences; SPEI-1 accumulated and soil moisture averaged over the
-  months while TWS was unobserved
-- spatial context: 8-neighbour means of anomaly, TWS, SPEI-3 change, and **5×5
-  neighbourhood means** of the dynamic features (anomaly, SPEI-6/12 change, accumulated
-  SPEI-1, soil-moisture change, slope, trend) — the second most important feature group
-- latitude, longitude, calendar month
-- **water balance from NCEP/NCAR Reanalysis-1** (Model B only): precipitation, evaporation
-  (from latent heat, 2.5 MJ/kg), runoff, snow water equivalent and total soil water
-  (0–200 cm) at t and at the last observed month, their changes, and **P − E − R accumulated
-  over the months while TWS was unobserved** — physically the change in stored water.
-  Public, no login (`downloads.psl.noaa.gov`), monthly means published within days of month
-  end, so operationally available at prediction time; contains no GRACE/TWS information.
-  Bilinearly regridded from the T62 Gaussian grid (~1.9°) to the challenge's 1° cells.
-  Gain on both validation layouts (−0.3% / −0.7%); precipitation and accumulated P−E−R are
-  the leading new features (`NOTES.md`).
+  months before the last observation; 24-month trend and deviation; the same *recent-window*
+  statistics over the 60 months before the last observation (mean, monthly climatology, trend).
+  The 2002–2015 long-term climatology anchors were removed: they bias every model upward
+  because the record trends drier.
+- covariates at t (never masked): SPEI-1/3/6/12, soil moisture; the same at the last observed
+  month; their differences; SPEI-1 accumulated and soil moisture averaged / min / max over the months
+  while TWS was unobserved; SPEI-1 and soil moisture one to three months before t.
+- spatial context at three scales: 8-neighbour means, **5×5 and 9×9** neighbourhood means of the
+  dynamic features (anomaly, SPEI-6/12 change, accumulated SPEI-1, soil-moisture change, trend),
+  computed by grid convolution on the 1° grid (wrapping in longitude). The 9×9 SPEI-6/12 changes
+  are the most important features after the cell's own anomaly: TWS responds to basin-scale forcing.
+- per-cell response coefficients from history only: slope of the one-month TWS change on SPEI-1 and
+  on the soil-moisture change, their correlations, and the standard deviation of the change.
+- **water balance from two public, operational reanalyses/analyses** (no login; NOAA PSL):
+  NCEP/NCAR R1 and NCEP-DOE R2 precipitation, evaporation (from latent heat), runoff, snow water
+  equivalent and 0–200 cm soil water at t and at the last observed month, their changes, and
+  P − E − R accumulated over the unobserved months; and the CPC leaky-bucket soil-moisture analysis
+  (0.5°, mm). All contain no GRACE/TWS information; monthly means are published within days.
+- latitude, longitude, calendar month.
 
-Training rows pair each training month with randomly drawn horizons 1–7 (4.9 M rows per
-model); 5 + 3 seeds; 260–280 rounds at learning rate 0.02, 127 leaves, 63-bin histograms.
+Training rows: for each training month and each of three draws, one horizon (1–7, one third at
+horizon 1) is drawn **for the whole globe**, mirroring the test blocks where all cells share the
+last-observed month; ~4.6 M rows for the final models. Training weights ramp toward recent years.
+Features are built once to disk (`build_mats.py`, ~11 min, float32 parquet); every model trains from
+that cache (`run_models.py`); the blend is assembled by `final_assemble.py`.
 
-Tested and **not** adopted (both layouts): ENSO index (NOAA ONI) as a covariate — heavily
-used by the trees yet worse on both layouts, i.e. it overfits a handful of ENSO cycles;
-ridge regression blend; horizon-specialist model; deeper/slower trees; per-cell linear
-covariate proxies; horizon-mix sample weights; per-horizon bias correction (does not
-transfer between layouts). Log: `NOTES.md`.
+Tested and **not** adopted (both layouts, `NOTES.md`): ENSO index (overfits a few cycles); ridge
+blend; horizon-specialist model; per-horizon bias correction; long-term anchors in the MLP (+0.006 /
++0.034 worse); wider or longer-trained MLPs; a U-Net on global maps (see NOTES).
 
 ## 4. Trustworthiness
 

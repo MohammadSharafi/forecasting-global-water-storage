@@ -52,3 +52,6 @@ Reference (previous final recipe, smoothed v6w+NCEP/v5 blend): A 0.6520 / B 0.57
 | mlp | 3-layer MLP (256, SiLU, dropout 0.3, wd 1e-3), 1 epoch one-cycle, MPS, ~25 s | **0.6479** | **0.5513** | adopt; overfits after epoch 1 (cell memorisation) |
 | blend | cat+mlp 50/50 | 0.6407 (+smooth+traj **0.6353**) | mlp-dominated: NNLS 0.92 mlp (0.5469) | final: mlp-heavy blend |
 Memory rule confirmed the hard way: the FINAL matrix build died silently (OOM) while tree models ran beside it. Builder alone: ~11 min, 4.6 M rows.
+| final v1 | 0.5 mlp(5 seeds) + 0.2 mlp-no-latlon(2) + 0.1 lgb(3) + 0.1 xgb(3) + 0.1 cat(2), smooth + traj | A **0.6363** (bias −0.010) | B **0.5497** (bias +0.041) | sub_s2_v1.csv — upload #1 |
+| mlp sweep | lr 5e-4 / 2e-3, dropout 0.2 / 0.45, wd 1e-2, width 512, 2 epochs, no lat/lon | mixed, all within ±0.003 | | keep default; no-lat/lon used as diversity |
+| mlp + long-term anchors | featset with clim_next etc. | 0.6552 | 0.5849 | reject (as for trees) |
