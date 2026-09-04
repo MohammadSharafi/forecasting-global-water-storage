@@ -13,3 +13,4 @@
 | ridge | ridge blend w=0.1–0.4 | 0.663–0.675 | reject |
 
 Memory rule: one heavy process at a time (16 GB machine); features built once to disk.
+| weights | per_row=4, test-horizon-mix sample weights | 0.6607 (unweighted 0.6615) | within noise; feature set plateaued |
