@@ -23,3 +23,5 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 | sub_v4_ar / smooth | 0.661 / 0.658 | pending |
 | sub_v4_ar_6dp | 0.661 | **0.7188** |
 | sub_v4_ar_smooth_6dp | 0.658 | **0.7168** |
+| sub_v5_6dp / sub_v5_smooth_6dp | 0.6555 / ~0.652 | pending |
+| probe_persistence | 0.757 | pending |
