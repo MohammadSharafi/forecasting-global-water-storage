@@ -14,3 +14,10 @@
 
 Memory rule: one heavy process at a time (16 GB machine); features built once to disk.
 | weights | per_row=4, test-horizon-mix sample weights | 0.6607 (unweighted 0.6615) | within noise; feature set plateaued |
+
+# Leaderboard calibration (public, 30% of test)
+| file | val A | public LB |
+|---|---|---|
+| sub_v2_residual | 0.669 | **0.735** |
+| probe_persistence | 0.757 | pending — defines the test baseline |
+| sub_v4_ar / smooth | 0.661 / 0.658 | pending |
