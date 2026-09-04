@@ -33,3 +33,6 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 | v7 ONI | + NOAA ONI (t, known, delta, 3-mo) | A 0.6598 / B 0.5774 (v6 ref 0.6569 / 0.5765) | **reject**: heavily used yet worse -> overfits few ENSO cycles |
 | v6+w | recent-year sample weights (ramp 0.3->1) | A 0.6565 / B 0.5749 | small consistent gain; adopt |
 | sub_final_fallback_6dp | v6w (5 seeds) 50/50 v5 (3 seeds), smoothed | pending (tomorrow's first upload) |
+| h1 specialist | separate model for h=1 rows | A 0.6568 (shared 0.6560) / B 0.5727 (0.5747) | mixed; not adopted |
+| deep variant | 255 leaves, lr 0.01, ff 0.5 | A 0.6559 / B 0.5760; blend no gain | not adopted |
+Plateau of the feature-only stack: A ≈ 0.656, B ≈ 0.575. Remaining lever: ERA5 water-balance covariates (needs CDS key).
