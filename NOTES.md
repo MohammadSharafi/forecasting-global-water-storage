@@ -1,0 +1,15 @@
+# Experiment log (validation layout A unless stated; persistence = 0.757)
+
+| id | change | RMSE | verdict |
+|---|---|---|---|
+| v1 | LGB, level target, in-sample climatology | 0.712 | train/val mismatch (early stop @37) |
+| v2 | LOYO climatology, neighbours, slope; residual target | 0.669 | keep residual target |
+| v3 | + per-cell covariate proxies, drop gap-target rows | 0.672 | no gain, dropped |
+| B  | regularised params / huber | 0.669–0.671 | plateau -> features, not params |
+| v4 | + AR lags 1/2/3/6/12, 24-mo trend/dev | **0.661** (layout B 0.593, −13.7%) | keep |
+| v5 | + 5x5 neighbourhood means | killed (OOM, 3 jobs parallel) | untested |
+| smooth | residual smoothing r=1, w=0.7 | 0.658 / B 0.591 | keep as post-process |
+| bias | per-horizon bias correction across layouts | worse both ways | reject (block noise) |
+| ridge | ridge blend w=0.1–0.4 | 0.663–0.675 | reject |
+
+Memory rule: one heavy process at a time (16 GB machine); features built once to disk.
