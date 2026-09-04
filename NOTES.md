@@ -21,3 +21,5 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 | sub_v2_residual | 0.669 | **0.735** |
 | probe_persistence | 0.757 | pending — defines the test baseline |
 | sub_v4_ar / smooth | 0.661 / 0.658 | pending |
+| sub_v4_ar_6dp | 0.661 | **0.7188** |
+| sub_v4_ar_smooth_6dp | 0.658 | **0.7168** |
