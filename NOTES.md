@@ -25,3 +25,5 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 | sub_v4_ar_smooth_6dp | 0.658 | **0.7168** |
 | sub_v5_6dp / sub_v5_smooth_6dp | 0.6555 / ~0.652 | pending |
 | probe_persistence | 0.757 | pending |
+| v5+recent | + 60-mo recent anchors | A 0.6585 / B 0.5809 | mixed |
+| v6 | recent anchors, long-term anchors removed | A 0.6571 / B **0.5760** | bias unchanged (+0.014/+0.057); blend with v5 |
