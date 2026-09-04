@@ -16,5 +16,5 @@ for year in range(2002,2020):
     if os.path.exists(out) and os.path.getsize(out)>1e5: print("have",out); continue
     c.retrieve("reanalysis-era5-single-levels-monthly-means",
         {"product_type":"monthly_averaged_reanalysis","variable":VARS,"year":str(year),
-         "month":[f"{m:02d}" for m in range(1,13)],"time":"00:00","grid":[1.0,1.0],"format":"netcdf"},out)
+         "month":[f"{m:02d}" for m in range(1,13)],"time":"00:00","grid":[1.0,1.0],"area":[89.5,-179.5,-89.5,179.5],"format":"netcdf"}  # .5-centred 1-deg grid = challenge cells,out)
     print("downloaded",out,flush=True)
