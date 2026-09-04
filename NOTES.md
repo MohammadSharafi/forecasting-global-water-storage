@@ -56,3 +56,6 @@ Memory rule confirmed the hard way: the FINAL matrix build died silently (OOM) w
 | mlp sweep | lr 5e-4 / 2e-3, dropout 0.2 / 0.45, wd 1e-2, width 512, 2 epochs, no lat/lon | mixed, all within ±0.003 | | keep default; no-lat/lon used as diversity |
 | mlp + long-term anchors | featset with clim_next etc. | 0.6552 | 0.5849 | reject (as for trees) |
 | U-Net maps | 3-level U-Net on global 1° maps (45 channels from the cache), one sample per (t, t_known), longitude-roll augmentation | 0.6769 alone (best epoch 3, then overfits); blend w=0.1–0.3 no gain after post-processing | — | reject |
+| mlp bagging | 4 MLPs on different 50% subsamples vs 3 full-data seeds | bag 0.6357 vs full 0.6367 (pp blend) | bag 0.5525 vs full 0.5498 | mixed; keep full-data seeds |
+| final v1 alt | tree-heavier: 0.5 mlp / 0.5 trees | A 0.6361 | B 0.5523 | sub_s2_v1_treeheavy.csv — upload #2 to let the LB arbitrate the MLP weight |
+Remaining lever: ERA5 / ERA5-Land water balance (needs the CDS token, see ERA5_SETUP.md); the loader `features_era5.py` and the cache builder are ready for it.
