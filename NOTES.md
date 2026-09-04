@@ -32,3 +32,4 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 | sub_v6_6dp / sub_v56_blend(_smooth) | v6 A 0.6571 B 0.5760; blend A 0.6552 | pending — v6 vs v5 test preds differ by 0.1125 RMSE |
 | v7 ONI | + NOAA ONI (t, known, delta, 3-mo) | A 0.6598 / B 0.5774 (v6 ref 0.6569 / 0.5765) | **reject**: heavily used yet worse -> overfits few ENSO cycles |
 | v6+w | recent-year sample weights (ramp 0.3->1) | A 0.6565 / B 0.5749 | small consistent gain; adopt |
+| sub_final_fallback_6dp | v6w (5 seeds) 50/50 v5 (3 seeds), smoothed | pending (tomorrow's first upload) |
