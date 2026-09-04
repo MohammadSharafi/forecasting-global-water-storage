@@ -39,3 +39,16 @@ Plateau of the feature-only stack: A ≈ 0.656, B ≈ 0.575. Remaining lever: ER
 | v6w + NCEP | NCEP R1 monthly P, E(latent heat), runoff, SWE, soil water; at t, at t_known, accumulated P-E-R over hidden months | A **0.6533** (ref 0.6555) / B **0.5711** (ref 0.5750) | adopt; public, no-login, operational (days latency) |
 Final for tomorrow: sub_final_ncep_6dp = 0.5*(v6w+NCEP, 5 seeds) + 0.5*(v5, 3 seeds), smoothed. Backup: sub_final_fallback_6dp.
 | sub_final_ncep_6dp | built 4 Sep; NCEP test coverage 99.9%; differs from fallback by 0.033 RMSE | pending (tomorrow #1) |
+
+# Session 2 (5 Sep) — cached matrices (out/mats), new features, model families, post-processing
+Reference (previous final recipe, smoothed v6w+NCEP/v5 blend): A 0.6520 / B 0.5779.
+| id | change | A | B | verdict |
+|---|---|---|---|---|
+| traj | within-block trajectory smoothing of the predicted change along the horizon (w=0.35) | −0.004 | −0.002 | adopt (post-process) |
+| coherent rows | one horizon per (month, draw) for the whole globe (test-like neighbourhoods) | 0.6554 (v6n) | 0.5757 (v6n) | slightly worse than random draws alone, but enables grid features; 25% subsample loses nothing |
+| all feats | + radius-4 grid-convolution neighbourhood means, NCEP R2, CPC leaky-bucket soil moisture, covariate window stats/lags, per-cell response slopes | **0.6499** | **0.5666** | adopt; w4_SPEI_06/12_d and w4_spei1_acc are top features |
+| xgb | XGBoost hist, depth 9, eta 0.03, same features | 0.6494 | 0.5657 | adopt |
+| cat | CatBoost depth 8, lr 0.03 | 0.6463 | 0.5763 (early stop 134, bias +0.12) | use with low weight |
+| mlp | 3-layer MLP (256, SiLU, dropout 0.3, wd 1e-3), 1 epoch one-cycle, MPS, ~25 s | **0.6479** | **0.5513** | adopt; overfits after epoch 1 (cell memorisation) |
+| blend | cat+mlp 50/50 | 0.6407 (+smooth+traj **0.6353**) | mlp-dominated: NNLS 0.92 mlp (0.5469) | final: mlp-heavy blend |
+Memory rule confirmed the hard way: the FINAL matrix build died silently (OOM) while tree models ran beside it. Builder alone: ~11 min, 4.6 M rows.

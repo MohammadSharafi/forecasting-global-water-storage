@@ -20,3 +20,13 @@ if __name__=="__main__":
         print(f"layout{sfx or ' A'}: raw={r(p):.4f}")
         for radius,iters,w in [(1,1,0.5),(1,1,0.7),(1,1,1.0),(1,2,0.5),(1,3,0.5),(2,1,0.5),(2,1,0.7),(2,2,0.5)]:
             print(f"   radius={radius} iters={iters} w={w}: {r(smooth(tp,p,w,radius,iters)):.4f}")
+
+def traj_smooth(df, pred, w=0.35):
+    """Smooth the predicted change along the horizon within a block: for the same (cell, t_known),
+    blend each residual with the mean of its horizon neighbours (h-1, h+1). df: lat, lon, t_known, horizon, tws_known."""
+    d=df.select(["lat","lon","t_known","horizon","tws_known"]).with_row_index("i").with_columns(pl.Series("res",pred-df["tws_known"].to_numpy())).sort(["lat","lon","t_known","horizon"])
+    g=["lat","lon","t_known"]
+    e=d.with_columns(pl.col("res").shift(1).over(g).alias("rm"),pl.col("res").shift(-1).over(g).alias("rp"),pl.col("horizon").shift(1).over(g).alias("hm"),pl.col("horizon").shift(-1).over(g).alias("hp"))
+    e=e.with_columns(pl.when(pl.col("hm")==pl.col("horizon")-1).then(pl.col("rm")).otherwise(None).alias("rm"),pl.when(pl.col("hp")==pl.col("horizon")+1).then(pl.col("rp")).otherwise(None).alias("rp"))
+    e=e.with_columns(pl.mean_horizontal(["rm","rp"]).alias("nb")).with_columns(pl.when(pl.col("nb").is_null()).then(pl.col("res")).otherwise((1-w)*pl.col("res")+w*pl.col("nb")).alias("res2")).sort("i")
+    return (e["tws_known"]+e["res2"]).to_numpy()

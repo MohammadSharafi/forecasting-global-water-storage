@@ -63,3 +63,19 @@ def training_rows(hist, rng, per_row=2, max_h=7):
         c=c.join(have.rename({"time":"t_known"}),on=["lat","lon","t_known"],how="left").filter(pl.col("ok")).drop("ok","h")
         out.append(c)
     return pl.concat(out).unique(["lat","lon","time","t_known"])
+
+def training_rows_coherent(hist, rng, per_row=3, max_h=7):
+    """Like training_rows, but the horizon is drawn once per (month, draw) for the whole globe,
+    as in the test where all cells of a block share the same last-observed month. Neighbourhood
+    features then see full neighbourhoods, matching the test distribution."""
+    cells=hist.select(["lat","lon","time","target"])
+    have=hist.select(["lat","lon","time"]).with_columns(pl.lit(True).alias("ok"))
+    months=hist.select("time").unique().sort("time")
+    out=[]
+    for k in range(per_row):
+        n=len(months); h=np.where(rng.random(n)<0.34, 1, rng.integers(2,max_h+1,n))
+        mh=months.with_columns(pl.Series("h",h)).with_columns(pl.col("time").dt.offset_by(pl.format("-{}mo",pl.col("h")-1)).alias("t_known"))
+        c=cells.join(mh,on="time",how="inner")
+        c=c.join(have.rename({"time":"t_known"}),on=["lat","lon","t_known"],how="left").filter(pl.col("ok")).drop("ok","h")
+        out.append(c)
+    return pl.concat(out).unique(["lat","lon","time","t_known"])
