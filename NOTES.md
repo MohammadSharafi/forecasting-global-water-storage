@@ -38,3 +38,4 @@ Memory rule: one heavy process at a time (16 GB machine); features built once to
 Plateau of the feature-only stack: A ≈ 0.656, B ≈ 0.575. Remaining lever: ERA5 water-balance covariates (needs CDS key).
 | v6w + NCEP | NCEP R1 monthly P, E(latent heat), runoff, SWE, soil water; at t, at t_known, accumulated P-E-R over hidden months | A **0.6533** (ref 0.6555) / B **0.5711** (ref 0.5750) | adopt; public, no-login, operational (days latency) |
 Final for tomorrow: sub_final_ncep_6dp = 0.5*(v6w+NCEP, 5 seeds) + 0.5*(v5, 3 seeds), smoothed. Backup: sub_final_fallback_6dp.
+| sub_final_ncep_6dp | built 4 Sep; NCEP test coverage 99.9%; differs from fallback by 0.033 RMSE | pending (tomorrow #1) |
