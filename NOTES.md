@@ -7,7 +7,7 @@
 | v3 | + per-cell covariate proxies, drop gap-target rows | 0.672 | no gain, dropped |
 | B  | regularised params / huber | 0.669–0.671 | plateau -> features, not params |
 | v4 | + AR lags 1/2/3/6/12, 24-mo trend/dev | **0.661** (layout B 0.593, −13.7%) | keep |
-| v5 | + 5x5 neighbourhood means | killed (OOM, 3 jobs parallel) | untested |
+| v5 | + 5x5 neighbourhood means of dynamic features | **0.6555** (best_iter 201) | keep; wide SPEI-6/12 deltas rank 3rd/4th |
 | smooth | residual smoothing r=1, w=0.7 | 0.658 / B 0.591 | keep as post-process |
 | bias | per-horizon bias correction across layouts | worse both ways | reject (block noise) |
 | ridge | ridge blend w=0.1–0.4 | 0.663–0.675 | reject |
