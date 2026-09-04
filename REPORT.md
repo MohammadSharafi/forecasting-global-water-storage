@@ -25,7 +25,7 @@ can see its own target. All numbers below are held-out.
 | | layout A | layout B | public LB |
 |---|---|---|---|
 | persistence | 0.757 | 0.687 | 0.886 |
-| **final stack** | **0.655** | **0.575** | **0.714** (v5-smooth; final stack pending) |
+| **final stack** | **0.653** | **0.571** | **0.714** (v5-smooth; final stack pending) |
 | gain vs persistence | −13.5% | −16.3% | −19.4% |
 
 The gain transferred to the test period in full — it is larger there because 2015–2018
@@ -53,6 +53,15 @@ Inputs, all available at or before month t:
   neighbourhood means** of the dynamic features (anomaly, SPEI-6/12 change, accumulated
   SPEI-1, soil-moisture change, slope, trend) — the second most important feature group
 - latitude, longitude, calendar month
+- **water balance from NCEP/NCAR Reanalysis-1** (Model B only): precipitation, evaporation
+  (from latent heat, 2.5 MJ/kg), runoff, snow water equivalent and total soil water
+  (0–200 cm) at t and at the last observed month, their changes, and **P − E − R accumulated
+  over the months while TWS was unobserved** — physically the change in stored water.
+  Public, no login (`downloads.psl.noaa.gov`), monthly means published within days of month
+  end, so operationally available at prediction time; contains no GRACE/TWS information.
+  Bilinearly regridded from the T62 Gaussian grid (~1.9°) to the challenge's 1° cells.
+  Gain on both validation layouts (−0.3% / −0.7%); precipitation and accumulated P−E−R are
+  the leading new features (`NOTES.md`).
 
 Training rows pair each training month with randomly drawn horizons 1–7 (4.9 M rows per
 model); 5 + 3 seeds; 260–280 rounds at learning rate 0.02, 127 leaves, 63-bin histograms.
@@ -92,8 +101,8 @@ set; the horizon is an explicit feature, so one model serves 1–7-month leads a
 leads need one constant changed. Per-cell statistics are computed from history at run time
 (recent-window variants adapt to trends), so new regions need no code changes. Limitation:
 the "what happened while unobserved" signal relies on Copernicus SPEI/soil moisture; a
-region without them degrades toward persistence. Only the challenge data is used —
-external ENSO indices were tested and rejected.
+region without them degrades toward persistence. External inputs are limited to a
+freely available, operational reanalysis (NCEP R1); ENSO indices were tested and rejected.
 
 ### 4.4 Sustainability & efficiency (≤100 words)
 CodeCarbon: one training run takes 46 s on a laptop CPU and emits **0.0002 kg CO₂e**; the
@@ -105,7 +114,9 @@ Gradient-boosted trees on tabular features were chosen over a deep sequence mode
 residual target lets a small model do the work.
 
 ## 5. Reproducibility
-`build_features.py` → `train_final.py`; final blend `build_final_fallback.py` (Python
+`build_features.py` → `train_final.py`; final blend `build_final_ncep.py` (fallback without reanalysis: `build_final_fallback.py`) (Python
 3.10; polars, LightGBM 4.7, shap, codecarbon — pinned in `requirements.txt`). Validation:
 `validation.py`, `validation_b.py`, `v6_val.py`. Seeds fixed; no randomness beyond seeded
-bagging. Only the challenge data enters the scored predictions.
+bagging. Scored predictions use the challenge data plus NCEP R1 monthly means (six files,
+`external/ncep/`, retrieved 4 Sep 2026 from downloads.psl.noaa.gov; retrieval script in
+`features_ncep.py` docstring).
