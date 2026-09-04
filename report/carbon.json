@@ -1,5 +1,5 @@
 {
- "train_seconds": 45.483943939208984,
- "kg_co2eq_one_seed": 0.0002125535037454634,
- "kg_co2eq_three_seeds": 0.0006376605112363902
+ "train_seconds": 45.806906938552856,
+ "kg_co2eq_one_seed": 0.0002182916967659318,
+ "kg_co2eq_final_ensemble_8_seeds": 0.0017463335741274544
 }
