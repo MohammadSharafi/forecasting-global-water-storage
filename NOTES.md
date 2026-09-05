@@ -59,3 +59,10 @@ Memory rule confirmed the hard way: the FINAL matrix build died silently (OOM) w
 | mlp bagging | 4 MLPs on different 50% subsamples vs 3 full-data seeds | bag 0.6357 vs full 0.6367 (pp blend) | bag 0.5525 vs full 0.5498 | mixed; keep full-data seeds |
 | final v1 alt | tree-heavier: 0.5 mlp / 0.5 trees | A 0.6361 | B 0.5523 | sub_s2_v1_treeheavy.csv — upload #2 to let the LB arbitrate the MLP weight |
 Remaining lever: ERA5 / ERA5-Land water balance (needs the CDS token, see ERA5_SETUP.md); the loader `features_era5.py` and the cache builder are ready for it.
+
+# Session 3 (5 Sep) — after LB feedback: sub_s2_v1 = 0.7191 public (v5-smooth 0.7142)
+Diagnosis (see scripts in the session transcript; numbers on train/validation):
+- The val→LB ratio is stable: persistence 0.757→0.886 (×1.17), our model 0.636→0.719 (×1.13). Gains transfer; the test period is simply noisier (late GRACE mission). Train months in 2015 already show h=1 persistence RMSE 1.0–1.2 vs 0.54 for 2002–2012, with month-to-month global offsets of ±0.3.
+- Temporal variogram of TWS: 2σ² intercept 0.30 (σ≈0.39) + 0.068/month; the field is spatially very smooth (cell vs 8-neighbour mean RMSE 0.055), so the unpredictable part is regional, not white per-cell noise. A Kalman/EWMA level as prediction base is worse than the last observation on both layouts (the models already handle it).
+- Leaderboard top: 0.560, 0.589, 0.623, then a cluster at 0.63. Prohibited information tested for scale only: interpolation between observed test blocks scores 0.634 on layout A (worse than our legit 0.636); next-month covariates give ~0.025; a model given the next observed block's TWS gains 0.006. None of these explains 0.56 → the top entries most likely use an external gap-free TWS product (prohibited by the rules; code review applies to the top 10).
+- Gap-month targets (7 of 18 test months, 39% of rows) are not interpolations of neighbouring months in train (checked on 2014-12 and 2015-06); they sit a bit closer to the previous real month. sub_s2_v2_fillshrink.csv shrinks the predicted change on those rows by (h−0.5)/h as a one-submission LB experiment.
