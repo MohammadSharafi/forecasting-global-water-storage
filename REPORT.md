@@ -69,6 +69,12 @@ Inputs, all available at or before month t:
   equivalent and 0–200 cm soil water at t and at the last observed month, their changes, and
   P − E − R accumulated over the unobserved months; and the CPC leaky-bucket soil-moisture analysis
   (0.5°, mm). All contain no GRACE/TWS information; monthly means are published within days.
+- **ERA5 monthly means (Copernicus Climate Data Store, free account)** on the challenge's 1° grid:
+  precipitation, evaporation, runoff, snow depth (water equivalent), total-column soil water (four
+  layers) and 2 m temperature at t and at the last observed month, their changes, and P − E − R
+  accumulated over the unobserved months. ERA5T is published ~5 days after month end, so this is
+  operationally available and rule-compliant; it contains no GRACE information. Gain on identical
+  rows: 0.3–0.7% per model, 0.6363 → 0.6347 (A) and 0.5497 → 0.5459 (B) for the blend.
 - latitude, longitude, calendar month.
 
 Training rows: for each training month and each of three draws, one horizon (1–7, one third at
