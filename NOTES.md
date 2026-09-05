@@ -68,3 +68,15 @@ Diagnosis (see scripts in the session transcript; numbers on train/validation):
 - Gap-month targets (7 of 18 test months, 39% of rows) are not interpolations of neighbouring months in train (checked on 2014-12 and 2015-06); they sit a bit closer to the previous real month. sub_s2_v2_fillshrink.csv shrinks the predicted change on those rows by (h−0.5)/h as a one-submission LB experiment.
 | sub_s2_v2_fillshrink | change shrunk on gap-month targets | public LB **0.7217** (v1 0.7191) | reject: gap-month targets are not smoother on the test |
 Public LB so far: v5-smooth 0.7142 (best), final_ncep ?, s2_v1 0.7191, s2_v2_fillshrink 0.7217. All within ±0.004: the stack is at its information limit; next input = ERA5.
+
+# Session 4 (5 Sep) — ERA5 monthly means (CDS token in place)
+Fields: tp, e, ro, sd, swvl1-4, t2m at t and t_known, differences, and P−E−R accumulated over the hidden months (21 features, prefix e5).
+Control on identical rows (no-ERA5) vs with ERA5:
+| model | A | B |
+|---|---|---|
+| lgb | 0.6498 → 0.6483 | 0.5669 → 0.5634 |
+| mlp (seed 0) | 0.6479 → 0.6453 | 0.5509 → 0.5472 |
+| xgb | 0.6494 → 0.6458 | 0.5657 → 0.5660 |
+| cat | 0.6463 → 0.6434 | 0.5763 → 0.5762 |
+| blend + post-processing | 0.6363 → **0.6347** | 0.5497 → **0.5459** |
+FINAL matrix rebuilt with PER_ROW=2 (3 draws exceeded memory with 181 columns). Loader note: CDS delivers a zip with two netcdf streams; joined on cell-month (features_era5.py).
