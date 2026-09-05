@@ -107,3 +107,10 @@ Conclusion: the unpredictable component is weather-independent, spatially cohere
 - Test observed months: mean −0.07..+0.09, std 0.87–0.99 → no scale/normalisation mismatch with train.
 - External data: NCEP R1/R2 and CPC are NOAA products, not on the permitted list (Copernicus / satellite / pretrained / open tools). ERA5-only feature sets under validation; if within noise, drop the NOAA inputs for the final.
 | review-safe sets (ERA5-only, no lat/lon) | lgb e5only_noll A/B, mlp, lgb v5x-noll: see logs | FINAL 24 models trained | sub_rs_recent, sub_rs_longterm, sub_rs_blend (50/50) — the Code-Review-safe configuration |
+
+# Organizer rulings (discussion "Addressing Some Open Chats", 13 Aug; "Neighbouring cells" 19 Aug)
+- NOT permitted as predictive features: raw lat/lon, cell IDs, coordinate-derived encodings, spatial embeddings. → v5-smooth, sub_c_* and all lat/lon-using stacks are OUT of the final. Only *_noll models qualify.
+- Permitted: lat/lon as lookup key; per-cell statistics from the cell's own past TWS; neighbouring cells' TWS at ≤ t incl. spatial filtering/aggregation; external non-TWS covariates with every source date ≤ t (NOAA NCEP/CPC therefore permitted if documented); ERA5 final as retrospective proxy for ERA5T (document in report); recursive forecasting.
+- "Any feature encoding month t+1 or later, from any source, remains grounds for disqualification" → trajectory smoothing removal was mandatory.
+- Scoring targets match the current CSVs; benchmark 0.8999 = starter notebook. A compliant participant (uzbtrust) reports "just above 0.70" with provided data + ERA5, no coordinates.
+- CodeCarbon instrumentation required for top-10 (already in place from session 1: report/carbon.json; re-run for the final models).
