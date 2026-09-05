@@ -106,3 +106,4 @@ Conclusion: the unpredictable component is weather-independent, spatially cohere
 - Organizers' starter says "Lat/Lon should not be used as features!" → review-safe final should avoid lat/lon (MLP no-lat/lon variant exists; trees to retrain).
 - Test observed months: mean −0.07..+0.09, std 0.87–0.99 → no scale/normalisation mismatch with train.
 - External data: NCEP R1/R2 and CPC are NOAA products, not on the permitted list (Copernicus / satellite / pretrained / open tools). ERA5-only feature sets under validation; if within noise, drop the NOAA inputs for the final.
+| review-safe sets (ERA5-only, no lat/lon) | lgb e5only_noll A/B, mlp, lgb v5x-noll: see logs | FINAL 24 models trained | sub_rs_recent, sub_rs_longterm, sub_rs_blend (50/50) — the Code-Review-safe configuration |
