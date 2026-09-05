@@ -13,7 +13,7 @@ NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
 NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
 from features_x import WIDE4, COVWIN, RESP
 SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
-      "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")]}
+      "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")]}
 F=SETS[FS]
 tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target"]+F)))
 seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))

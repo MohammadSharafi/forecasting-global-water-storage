@@ -80,3 +80,5 @@ Control on identical rows (no-ERA5) vs with ERA5:
 | cat | 0.6463 → 0.6434 | 0.5763 → 0.5762 |
 | blend + post-processing | 0.6363 → **0.6347** | 0.5497 → **0.5459** |
 FINAL matrix rebuilt with PER_ROW=2 (3 draws exceeded memory with 181 columns). Loader note: CDS delivers a zip with two netcdf streams; joined on cell-month (features_era5.py).
+| sub_s3_era5 | ERA5 ensemble | public LB **0.7194** (v1 0.7191) | no LB gain despite val gain |
+Hypothesis after four LB results: every "recent-anchor" (v6-style) model scores ~0.719; the v5 stack with long-term climatology anchors scores 0.714. Validation years 2012–15 were drying (recent anchors win); the 2015–18 test likely reversed (long-term anchors win). LB experiments: sub_s4_blend_v5s_era5 (50/50 v5-smooth + ERA5 ensemble), and the v5x stack (all new features, LONGTERM in, RECENT out). v5x validation: lgb A 0.6481 / B 0.5708, mlp A 0.6518 / B 0.5846 (wet bias +0.02..+0.07, as expected on dry layouts).
