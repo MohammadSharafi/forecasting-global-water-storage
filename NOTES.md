@@ -99,3 +99,10 @@ Next uploads: sub_s5_blend3 (equal v5s + v5x + era5), sub_s4_v5x_era5_blend, sub
 | D3 cross-layout NNLS stacking | A→B 0.5553 (equal 0.5581), B→A 0.6443 (equal 0.6387) | unstable; keep near-equal weights |
 | regime shrinkage toward slow levels (mean24/rmean60/cmean/clim/lag123), tested on noisy 2015 rows | best 0.8077→0.8069; others worse | models already shrink optimally; rejected |
 Conclusion: the unpredictable component is weather-independent, spatially coherent and temporally white; no legal input or representation found that predicts it. Remaining lever = blend weights across anchor philosophies (LB-determined, ~0.005).
+
+# Session 6 — forensic audit
+- COMPLIANCE FIX: trajectory smoothing used the prediction of the NEXT horizon (same cell, same t_known), which embeds covariates at t+1 → information after t. Causal version (previous horizon only) hurts (A 0.6395→0.6446, B 0.5471→0.5525). Removed from final_assemble.py. All sub_s2…sub_s5 files contained it; compliant rebuilds: sub_c_era5, sub_c_v5x, sub_c_blend3, sub_c_blend_v5s_era5, sub_c_blend_x4e3v3 (sub_v5_smooth_6dp was already compliant). Expect ≈+0.004 on the LB vs the non-compliant versions.
+- Starter notebook: an earlier gridded release had "future-looking _tp1 columns" and unmasked test TWS_t; masking was added "to prevent TWS_t at one test row from revealing the hidden target of another test row". Top LB scores (0.56 two months ago, 0.589 one month ago) plausibly come from that regime.
+- Organizers' starter says "Lat/Lon should not be used as features!" → review-safe final should avoid lat/lon (MLP no-lat/lon variant exists; trees to retrain).
+- Test observed months: mean −0.07..+0.09, std 0.87–0.99 → no scale/normalisation mismatch with train.
+- External data: NCEP R1/R2 and CPC are NOAA products, not on the permitted list (Copernicus / satellite / pretrained / open tools). ERA5-only feature sets under validation; if within noise, drop the NOAA inputs for the final.

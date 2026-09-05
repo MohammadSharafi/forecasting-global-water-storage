@@ -8,6 +8,6 @@ k=va["tws_known"].to_numpy(); acc=np.zeros(len(va)); wsum=0
 for name,w in spec:
     fs=sorted(glob.glob(f"out/mats/pred_FINAL_{name}_s*.npy")); assert fs,name
     p=np.mean([np.load(f) for f in fs],0); print(f"{name}: {len(fs)} seeds, mean change {np.mean(p-k):+.4f}"); acc+=float(w)*p; wsum+=float(w)
-p=acc/wsum; p=smooth(va,p,w=0.7,radius=1,iters=1); p=traj_smooth(va,p,w=0.35)
+p=acc/wsum; p=smooth(va,p,w=0.7,radius=1,iters=1)   # spatial smoothing only: same-month information. Trajectory smoothing removed (it used the next horizon's prediction, i.e. information after t).
 assert np.isfinite(p).all() and len(p)==280961
 pl.DataFrame({"ID":va["ID"],"Target":np.round(p,6)}).write_csv(f"out/{out}.csv",float_precision=6); print("wrote",f"out/{out}.csv",len(p))
