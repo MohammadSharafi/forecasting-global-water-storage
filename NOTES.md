@@ -88,3 +88,14 @@ Hypothesis after four LB results: every "recent-anchor" (v6-style) model scores 
 | sub_s4_blend_v5s_era5 | | public LB **0.7107** (best) | blending anchor philosophies works on the test period |
 Next uploads: sub_s5_blend3 (equal v5s + v5x + era5), sub_s4_v5x_era5_blend, sub_s5_blend_x4e3v3 (0.4/0.3/0.3). In parallel: models with BOTH anchor sets (featset allL) as a third family.
 | allL stack (both anchor sets) | lgb/xgb A 0.6498/0.6499, B 0.5684/0.5711 | FINAL preds differ from v5x by only 0.030 (trees pick the long-term anchors) | little diversity; sub_s5_allL, sub_s5_blend4 (v5s+v5x+era5+allL) built |
+
+# Session 5 — first-principles re-audit (all rule-compliant diagnostics)
+| test | result | conclusion |
+|---|---|---|
+| E1 EOF/low-rank denoising of the last observed field (k=10..200) as base | persistence 0.757→0.81–0.93 (A), 0.687→0.81–0.93 (B); worse at every rank | the fast component is real and persists; not removable by spatial filtering |
+| E2 upper bound: one-month TWS change vs ERA5 water balance of the TARGET month (perfect next-month weather) | R²≈0.006, corr −0.02; LGB holdout 0.6355→0.6346 | next month's weather does not explain the change → seasonal forecasts (C3S SEAS5) cannot help; not pursued |
+| E3 per-cell mean over 2004–09 | 0.20±0.60 (not a 2004–09 baseline); full-train mean 0.12±0.39 | standardisation period unknown; inferring the test-period mean from it would be future information → not used |
+| D3 disagreement shrinkage | corr(disagreement,|err|)=0.19–0.22 but shrinkage hurts | rejected |
+| D3 cross-layout NNLS stacking | A→B 0.5553 (equal 0.5581), B→A 0.6443 (equal 0.6387) | unstable; keep near-equal weights |
+| regime shrinkage toward slow levels (mean24/rmean60/cmean/clim/lag123), tested on noisy 2015 rows | best 0.8077→0.8069; others worse | models already shrink optimally; rejected |
+Conclusion: the unpredictable component is weather-independent, spatially coherent and temporally white; no legal input or representation found that predicts it. Remaining lever = blend weights across anchor philosophies (LB-determined, ~0.005).
