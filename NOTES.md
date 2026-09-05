@@ -87,3 +87,4 @@ Hypothesis after four LB results: every "recent-anchor" (v6-style) model scores 
 | sub_s4_v5x | | public LB **0.7141** | long-term anchors confirmed (recent-anchor versions 0.719) |
 | sub_s4_blend_v5s_era5 | | public LB **0.7107** (best) | blending anchor philosophies works on the test period |
 Next uploads: sub_s5_blend3 (equal v5s + v5x + era5), sub_s4_v5x_era5_blend, sub_s5_blend_x4e3v3 (0.4/0.3/0.3). In parallel: models with BOTH anchor sets (featset allL) as a third family.
+| allL stack (both anchor sets) | lgb/xgb A 0.6498/0.6499, B 0.5684/0.5711 | FINAL preds differ from v5x by only 0.030 (trees pick the long-term anchors) | little diversity; sub_s5_allL, sub_s5_blend4 (v5s+v5x+era5+allL) built |
