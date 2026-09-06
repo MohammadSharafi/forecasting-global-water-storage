@@ -118,3 +118,19 @@ Conclusion: the unpredictable component is weather-independent, spatially cohere
 - 13 Jul ("Data Update"): served files had been mismatched with the scoring targets (v2 vs pre-fix); "submissions against the mismatched version will be re-evaluated" — participants report the LB was never updated. 10 Aug probe analysis (uzbtrust): all-zeros 1.0138 → E[y²]=1.028; persistence corr 0.61; starter recipe scored 0.659 on v2 vs 0.900 now. → The 0.56–0.63 scores are legacy/mismatch-era; the compliant frontier on current files is ~0.70.
 - Zindi platform rule quoted by participants: external data should be declared on the discussion board (“sent to Zindi for confirmation”). Recommend a declaration post listing ERA5, NCEP R1/R2, CPC soil moisture.
 | final compliant candidates | sub_f_recent / sub_f_longterm (no lat/lon, NOAA+ERA5), sub_f_blend (50/50), sub_f_blend4 (+ ERA5-only stacks), sub_rs_blend (ERA5-only) | validation: no-lat/lon costs nothing (lgb A 0.6483/0.6483, B 0.5629 vs 0.5634) | upload order: sub_f_blend, sub_rs_blend, then adjust |
+
+# Session 7 — smoothed anchor (the missed signal)
+Organiser ruling 24 Aug explicitly permits neighbouring cells' TWS at months <= t incl. spatial filtering/aggregation.
+Great-circle neighbourhood mean of the last-observed TWS field (longitude window scaled by 1/cos(lat)), radii 300/500/800 km:
+| | layout A | layout B |
+|---|---|---|
+| raw anchor as persistence | 0.7569 | 0.6869 |
+| 300 km smoothed anchor as persistence | 0.7239 | 0.6535 |
+| 500 km | 0.7172 | 0.6520 |
+| post-hoc re-base of the blend, 300 km, a=0.3 | 0.6385 -> 0.6346 | 0.5560 -> 0.5523 |
+As features (sa300/500/800, deviations, sa_grad), retrained:
+| lgb recent-anchor | 0.6483 -> **0.6452** | 0.5629 -> **0.5555** |
+| lgb long-term | 0.6483 -> **0.6463** | 0.5692 -> **0.5630** |
+| mlp recent-anchor | 0.6453 -> **0.6437** | 0.5538 -> **0.5452** |
+Why it was missed: earlier neighbourhood features were boxes in grid cells (radius 1-4) applied mostly to dynamic covariates, and the global EOF denoising test (session 5) rejected low-rank filtering of the field. A physical-radius mean of the anchor itself is a different operator and is the one that works.
+CodeCarbon (final config, one seed per family, both anchor sets): 0.0076 kg CO2e total; report_final/carbon.json.
