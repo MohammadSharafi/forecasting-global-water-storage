@@ -142,3 +142,6 @@ Note: run_models.py strips the `_sa` suffix before naming outputs, so anchor mod
 | sa2 (smoothed trends, 2 radii) | A lgb 0.6460 / mlp 0.6419; B lgb 0.5551 / mlp 0.5523 | mixed vs sa (A 0.6452/0.6437; B 0.5555/0.5452) | reject |
 | sa3 (per-cell local-deviation persistence, LOYO betas; mean beta 0.20) | standalone predictor h=1: A 0.7078->0.6799, B 0.5693->0.5500. In models: lgb v5x better both layouts (0.6463->0.6454, 0.5630->0.5604); lgb recent mixed; **MLP much worse both layouts** (0.6437->0.6573, 0.5452->0.5640) | reject (net effect on the blend ~0.001, adds review surface) |
 | anomaly-field smoothing (de-mean neighbours before averaging) | A 0.7400 vs raw-field 0.7239; B 0.6649 vs 0.6535 | reject — the raw field is the more coherent one |
+| sub_g_recent | recent-anchor stack alone (compliant, anchors) | public LB **0.7191** | unchanged vs pre-anchor recent (0.7194): the test gain of sub_g_blend (0.7116) came from the long-term stack |
+| re-base after anchor features | p + a*(sa300 - tws_known), a=0.3 | A −0.0026, B −0.0017 at every w_long | adopt (post-process; uses only t_known information) |
+Candidates: sub_h_l5_rb (50/50 + rebase), sub_h_l7 (0.3/0.7), sub_h_l7_rb, sub_h_l85_rb, sub_h_l10_rb. Upload order: sub_g_longterm (end point), sub_h_l7_rb, then interpolate.
