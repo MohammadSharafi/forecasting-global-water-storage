@@ -145,3 +145,5 @@ Note: run_models.py strips the `_sa` suffix before naming outputs, so anchor mod
 | sub_g_recent | recent-anchor stack alone (compliant, anchors) | public LB **0.7191** | unchanged vs pre-anchor recent (0.7194): the test gain of sub_g_blend (0.7116) came from the long-term stack |
 | re-base after anchor features | p + a*(sa300 - tws_known), a=0.3 | A −0.0026, B −0.0017 at every w_long | adopt (post-process; uses only t_known information) |
 Candidates: sub_h_l5_rb (50/50 + rebase), sub_h_l7 (0.3/0.7), sub_h_l7_rb, sub_h_l85_rb, sub_h_l10_rb. Upload order: sub_g_longterm (end point), sub_h_l7_rb, then interpolate.
+| sub_g_longterm | long-term stack alone (anchors, compliant) | public LB **0.7110** (best) | recent 0.7191, 50/50 0.7116, 0.3/0.7+rebase.3 0.7113 → weight curve flat from 0.5 to 1.0; recent stack adds nothing on the test |
+Noise regime check (information at <= t only): RMS of the cell's deviation from its 300 km neighbourhood mean, train 2002-14 vs the six fully observed test months — see session-8 output. Next probes: sub_h_l10_rb (long-term + rebase 0.3), sub_h_l10_rb5 (0.5), sub_h_l10_rb3_500 (500 km, 0.3).
