@@ -134,3 +134,7 @@ As features (sa300/500/800, deviations, sa_grad), retrained:
 | mlp recent-anchor | 0.6453 -> **0.6437** | 0.5538 -> **0.5452** |
 Why it was missed: earlier neighbourhood features were boxes in grid cells (radius 1-4) applied mostly to dynamic covariates, and the global EOF denoising test (session 5) rejected low-rank filtering of the field. A physical-radius mean of the anchor itself is a different operator and is the one that works.
 CodeCarbon (final config, one seed per family, both anchor sets): 0.0076 kg CO2e total; report_final/carbon.json.
+| sub_f_blend | compliant (no lat/lon, no traj), NOAA+ERA5, 50/50 anchors | public LB **0.7157** | best COMPLIANT score; earlier 0.7107/0.7141 files used coordinates |
+| sub_g_blend | + smoothed-anchor features | val A 0.6382 / B 0.5515 (single seed; ref 0.6385/0.5560) | next upload |
+Bug found and fixed in final_assemble.py: the seed glob `pred_FINAL_{name}_s*.npy` also matched the CodeCarbon probe files `..._s0_carbon.npy`, mixing pre-anchor models into two blends. Now matched with an exact `_s<digits>.npy` regex; probe files deleted.
+Note: run_models.py strips the `_sa` suffix before naming outputs, so anchor models overwrite same-featset predictions. All FINAL preds for allnoll / v5x_noll are now the smoothed-anchor versions (intended); sub_f_blend.csv is frozen on disk as the 0.7157 reference.
