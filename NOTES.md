@@ -150,3 +150,4 @@ Noise regime check (information at <= t only): RMS of the cell's deviation from 
 | allL_noll_sa (both anchor sets, no lat/lon, smoothed anchors) | A lgb 0.6461 / mlp 0.6536; B lgb 0.5612 / mlp 0.5859 | FINAL 12 models: sub_i_both; sub_i_lt_both = 50/50 with the long-term stack | LB probe |
 | family split of the long-term stack | sub_i_lt_trees (lgb .4 xgb .4 cat .2), sub_i_lt_mlp, sub_i_lt_lgbxgb | | LB probes: is the MLP what fails in the test regime? |
 | uniform training weights (no recent-year ramp) for the long-term stack | pipeline11 running | | LB probe (test regime punishes trend extrapolation) |
+| uniform weights, long-term lgb | A 0.6470 (ramp 0.6463), B 0.5664 (ramp 0.5630) | validation prefers the ramp, as expected for the drying layouts | sub_j_lt_uniform built (12 models) — LB decides |
