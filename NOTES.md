@@ -138,3 +138,7 @@ CodeCarbon (final config, one seed per family, both anchor sets): 0.0076 kg CO2e
 | sub_g_blend | + smoothed-anchor features | val A 0.6382 / B 0.5515 (single seed; ref 0.6385/0.5560) | next upload |
 Bug found and fixed in final_assemble.py: the seed glob `pred_FINAL_{name}_s*.npy` also matched the CodeCarbon probe files `..._s0_carbon.npy`, mixing pre-anchor models into two blends. Now matched with an exact `_s<digits>.npy` regex; probe files deleted.
 Note: run_models.py strips the `_sa` suffix before naming outputs, so anchor models overwrite same-featset predictions. All FINAL preds for allnoll / v5x_noll are now the smoothed-anchor versions (intended); sub_f_blend.csv is frozen on disk as the 0.7157 reference.
+| sub_g_blend | smoothed-anchor blend | public LB **0.71159** | best compliant; beats the old non-compliant 0.7107-class files |
+| sa2 (smoothed trends, 2 radii) | A lgb 0.6460 / mlp 0.6419; B lgb 0.5551 / mlp 0.5523 | mixed vs sa (A 0.6452/0.6437; B 0.5555/0.5452) | reject |
+| sa3 (per-cell local-deviation persistence, LOYO betas; mean beta 0.20) | standalone predictor h=1: A 0.7078->0.6799, B 0.5693->0.5500. In models: lgb v5x better both layouts (0.6463->0.6454, 0.5630->0.5604); lgb recent mixed; **MLP much worse both layouts** (0.6437->0.6573, 0.5452->0.5640) | reject (net effect on the blend ~0.001, adds review surface) |
+| anomaly-field smoothing (de-mean neighbours before averaging) | A 0.7400 vs raw-field 0.7239; B 0.6649 vs 0.6535 | reject — the raw field is the more coherent one |

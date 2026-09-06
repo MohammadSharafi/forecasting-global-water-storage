@@ -13,24 +13,29 @@ NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
 NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
 from features_x import WIDE4, COVWIN, RESP
 SA=["sa300","dsa300","sa500","dsa500","sa800","dsa800","sa_grad"]
+SA3=["lb300","la300","ln300","lp300","lpd300","lb500","la500","ln500","lp500","lpd500"]
+USE_SA3=FS.endswith("_sa3") and os.path.exists(f"out/mats/{L}_tr_anchor3.parquet")
+if USE_SA3: FS=FS[:-4]
 SA2=["sb300","sb300_d1","sb300_d2","sb300_d3","sb300_d12","sb300_trend","sb300_persist","sb600","sb600_d1","sb600_d2","sb600_d3","sb600_d12","sb600_trend","sb600_persist","sb_scale"]
 USE_SA2=FS.endswith("_sa2") and os.path.exists(f"out/mats/{L}_tr_anchor2.parquet")
 if USE_SA2: FS=FS[:-4]
-USE_SA=os.path.exists(f"out/mats/{L}_tr_anchor.parquet") and (FS.endswith("_sa") or USE_SA2)
+USE_SA=os.path.exists(f"out/mats/{L}_tr_anchor.parquet") and (FS.endswith("_sa") or USE_SA2 or USE_SA3)
 if FS.endswith("_sa"): FS=FS[:-3]
 SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
       "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")]}
-F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])
-tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target"]+[f for f in F if f not in SA])))
+F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])
+tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
+if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
 seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))
 if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
 X=tr.select(F).to_numpy(); y=(tr["target"]-tr["tws_known"]).to_numpy().astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32); del tr; gc.collect()
-va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA])))
+va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
 if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
+if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
 Xv=va.select(F).to_numpy(); kv=va["tws_known"].to_numpy(); yv=va["target"].to_numpy() if L!="FINAL" else None; del va; gc.collect()
 print(f"{L} {M} {FS}: X {X.shape} Xv {Xv.shape} ({time.time()-t0:.0f}s)",flush=True)
 seed=int(os.environ.get("SEED","0"))
