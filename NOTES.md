@@ -467,3 +467,26 @@ Two follow-ups, to build ONLY if the oracle is large AND the persistence correla
     global covariate anomalies. Higher overfit risk (one series, ~160 months) -- the same trap
     that sank ONI -- so only worth it if the oracle is large.
 Run after the rebuild: python globalshift.py A lgb_v5x_noll ; python globalshift.py B lgb_v5x_noll
+
+# Session 9k — run_night.sh: the resumable overnight orchestrator
+- FULLY RESUMABLE. Every step writes a marker in out/night/ on success; a rerun skips what is
+  done, down to individual grid runs and individual training seeds. Interrupt it at any point and
+  rerun the same command. FORCE=1 redoes everything.
+- A failing step never aborts the run. Verified on a fixture: a failing subprocess is retried on
+  the next run and is NOT marked done, and later phases still execute.
+- eval runs in a SUBSHELL. Without that, any step whose command called exit would kill the
+  orchestrator, and a cd would move it. Verified: a step calling `exit 9` no longer stops the run.
+- Phases: (1) diagnostics on the CURRENT matrices, deliberately before the rebuild -- eval_mix,
+  ceiling, globalshift; (2) rebuild A/B with every new feature; (3) the 9-experiment grid, each
+  run its own step; (3b) scored under the test horizon mix; (4) select_config + post-choice
+  diagnostics; (5) xgb on validation and blend_scan -- the lgb/xgb weight has been hardcoded at
+  50/50 forever and never fitted; (6) FINAL matrix + the feature-completeness guard; (7) FINAL
+  config 1 = the grid winner; (8) config 2 = a deliberately different capacity, so the two private
+  slots hold genuinely different files; (8b, DEEP) config 3 = the pre-session-9 feature set as an
+  insurance file; (9) assemble + a single report.
+- blend_scan.py: scans the lgb/xgb weight under the test mix on both layouts, clips to
+  [0.25,0.75] so the blend never collapses to one family, refuses to move off 0.50 when the gain
+  is below what validation can resolve, and warns when the two layouts disagree by more than 0.3.
+- Honest runtime: ~4 h default (SEEDS=8), ~8 h with DEEP=1 (16 seeds, 3 configs). There is not
+  50 h of USEFUL work here -- seeds are 1/sqrt(n) so going past ~16 buys ~0.0003. The value of
+  the resumability is being able to run it in chunks, not to fill wall-clock time.
