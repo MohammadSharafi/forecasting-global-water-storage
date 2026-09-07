@@ -210,3 +210,29 @@ Noise regime check (information at <= t only): RMS of the cell's deviation from 
   post-processes have just cost 0.007 and 0.021.
 - sub_i_both vs sub_i_lt_both differ by RMS 0.0166 (SE 6e-5): indistinguishable, do not spend two
   slots on them. sub_j_lt_uniform differs from sub_i_lt_both by RMS 0.0390.
+
+# Session 9c (7 Sep) — the external covariates were never converted to anomalies
+Prompted by: compliant entries reported at 0.69-0.70, i.e. ~0.019 below our 0.7093. That is far
+more than blend tuning can explain, so the gap is structural.
+- EVERY ERA5 and NCEP feature is a RAW PHYSICAL LEVEL in mm (e5PER_acc, P_acc, e5SW_t, SWE_t...),
+  while lat/lon are excluded from every final feature set. The model is shown "accumulated
+  P-E-R = 350 mm" with no way to know that is a drought in the Amazon and a record flood in the
+  Sahel. It has per-cell TWS statistics (cmean, csd, clim_next, ac1, mad1) to locate a cell in TWS
+  space, and NOTHING to locate it in covariate space.
+- The target is a standardised anomaly (RMS 1.014), and the change in an anomaly is driven by the
+  ANOMALY of the water balance, not its raw total: a cell receiving its normal seasonal 350 mm
+  should have zero expected change. add_era5 carries the comment "anomaly of accumulated balance vs
+  the cell's climatological balance for those months" directly above its `return` -- identified,
+  never implemented. This is the most likely explanation for ERA5 buying only 0.0016 on validation
+  and nothing on the LB despite P-E-R being definitionally the change in stored water.
+- features_anom.py: per-cell, per-calendar-month climatology from HISTORY MONTHS ONLY, then
+  storage vars -> z-scored _t/_k/_d; flux vars -> z-scored _t plus _acc = accumulated anomaly over
+  (t_known, t]. ~34 new features, all prefixed an_ so they can be ablated.
+  Robustness: cell SD floored at 5% of the variable's global anomaly SD and z clipped to +-10 --
+  without that, near-constant cells (subtropical snow, desert runoff) produced z-scores of 1e8.
+  Verified on synthetic data: per-cell mean 0 / sd 1 over the history period, degenerate cells give
+  exact zeros, accumulated anomaly matches hand computation to 1e-6.
+- Featsets v5x_noll_noanom / allnoll_noanom added for the ablation.
+- REQUIRES a matrix rebuild (build_mats.py A|B|FINAL) and then add_anchor_feats.py A|B|FINAL, since
+  the anchor parquets are row-aligned to the matrices. Memory: ~34 extra float32 columns is ~630 MB
+  on the 4.6M-row FINAL matrix -- keep PER_ROW=2 and run the build with nothing else alongside.

@@ -10,6 +10,7 @@ from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, ERA5F
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
+from features_anom import build as anom_build, add_anom, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 L=sys.argv[1]; os.makedirs("out/mats",exist_ok=True); t0=time.time()
 tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
 lats=tr["lat"].unique().to_list(); lons=tr["lon"].unique().to_list()
@@ -21,7 +22,10 @@ def feats(rows,cov_all,obs,sums,cell,resp,loyo):
     r=add_wide4(r); r=add_covwin(r,cov_all); r=add_response(r,resp)
     EF=[]
     if ERA is not None: r=add_era5(r,ERA); EF=ERA5F
-    F=FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF
+    AF=[]   # per-cell standardised covariate anomalies (features_anom): the level features above
+    for at,sz,fz in ANOM:   # are raw mm and unusable without lat/lon, which is not a feature
+        r,f=add_anom(r,at,sz,fz); AF+=f
+    F=FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF
     F=list(dict.fromkeys(F)); return r,F
 if L=="FINAL":
     te=pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
@@ -37,6 +41,13 @@ else:
     obs_hist=hist.select(["lat","lon","time","TWS_t"]); obs_all=pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat","lon","time","TWS_t"])])
     rows_va=tp.select(["lat","lon","time","t_known","target"]); meta_va=["lat","lon","time","t_known","horizon","tws_known","target"]
 sums=clim_sums(hist); _,cell=cell_stats(hist); resp=cell_response(hist)
+# Climatologies for the covariate anomalies come from HISTORY MONTHS ONLY, so no month at or
+# after a prediction target can enter them.
+HM=hist["time"].unique().to_list()
+ANOM=[x for x in (anom_build(ERA,ERA5_STORAGE,ERA5_FLUX,HM),
+                  anom_build(nc,NCEP_STORAGE,NCEP_FLUX,HM),
+                  anom_build(cov_all.select(["lat","lon","time"]+COV_STORAGE).unique(["lat","lon","time"]),COV_STORAGE,[],HM)) if x is not None]
+print("anomaly tables:",[(len(sz),len(fz)) for _,sz,fz in ANOM],f"({time.time()-t0:.0f}s)",flush=True)
 Xva,F=feats(rows_va,cov_all,obs_all,sums,cell,resp,False)
 Xva.select(list(dict.fromkeys(meta_va+F))).with_columns([pl.col(f).cast(pl.Float32) for f in F]).write_parquet(f"out/mats/{L}_va.parquet"); print("va",Xva.shape,f"({time.time()-t0:.0f}s)",flush=True)
 del Xva; gc.collect()

@@ -20,6 +20,7 @@ ALL=json.load(open("out/mats/feats.json"))
 F6=[f for f in FEATS2+AR+WIDE+RECENT if f not in LONGTERM]
 NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
 NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
+ANOMF=[f for f in ALL if f.startswith("an_")]   # per-cell standardised covariate anomalies (features_anom)
 from features_x import WIDE4, COVWIN, RESP
 SA=["sa300","dsa300","sa500","dsa500","sa800","dsa800","sa_grad"]
 SA3=["lb300","la300","ln300","lp300","lpd300","lb500","la500","ln500","lp500","lpd500"]
@@ -31,7 +32,10 @@ if USE_SA2: FS=FS[:-4]
 USE_SA=os.path.exists(f"out/mats/{L}_tr_anchor.parquet") and (FS.endswith("_sa") or USE_SA2 or USE_SA3)
 if FS.endswith("_sa"): FS=FS[:-3]
 SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
-      "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL_noll":[f for f in ALL if f not in ("lat","lon")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")]}
+      "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL_noll":[f for f in ALL if f not in ("lat","lon")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")],
+      # ablation pair for the covariate-anomaly features: same set with and without them
+      "v5x_noll_noanom":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("an_")],
+      "allnoll_noanom":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("an_")]}
 F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])
 AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
 def base_of(df):
