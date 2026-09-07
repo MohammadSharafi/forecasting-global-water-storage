@@ -139,8 +139,13 @@ if [ "$LAYOUT_C" = 1 ] && done_ build_C && have_time 2; then
 fi
 
 head1 "PHASE 3b  grid scored under the REAL TEST horizon mix"
+# layout C runs only the finalists, so asking it for the whole grid fails on the first
+# missing tag and produces no table at all.
+FULL="e1_base=lgb_v5x_noll:_e1 e2_anom=lgb_v5x_noll:_e2 e3_zonal=lgb_v5x_noll:_e3 e4_anom_zonal=lgb_v5x_noll:_e4 e8_bigsa=lgb_v5x_noll:_e8 e5_lgbm63=lgbm_v5x_noll:_e5 e6_lgbs31=lgbs_v5x_noll:_e6 e7_uniform=lgb_v5x_noll:_e7 e9_hmix=lgb_v5x_noll:_e9"
+FINALISTS="e1_base=lgb_v5x_noll:_e1 e4_anom_zonal=lgb_v5x_noll:_e4 e8_bigsa=lgb_v5x_noll:_e8"
 for X in $LAYOUTS; do
-  step "eval_grid_$X" "$PY eval_mix.py $X e1_base=lgb_v5x_noll:_e1 e2_anom=lgb_v5x_noll:_e2 e3_zonal=lgb_v5x_noll:_e3 e4_anom_zonal=lgb_v5x_noll:_e4 e8_bigsa=lgb_v5x_noll:_e8 e5_lgbm63=lgbm_v5x_noll:_e5 e6_lgbs31=lgbs_v5x_noll:_e6 e7_uniform=lgb_v5x_noll:_e7 e9_hmix=lgb_v5x_noll:_e9" || true
+  sets=$FULL; [ "$X" = C ] && sets=$FINALISTS
+  step "eval_grid_$X" "$PY eval_mix.py $X $sets" || true
   done_ "eval_grid_$X" && cat "$S/eval_grid_$X.log" >> "$R"
 done
 

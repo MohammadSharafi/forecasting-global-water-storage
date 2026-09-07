@@ -101,7 +101,9 @@ def fit(y, k, p, h, form="scale"):
 
 
 def apply(p, k, h, a, b=None):
-    j = np.clip(h, 1, 7)
+    # horizon is Float32 in the matrices (build_mats casts every feature), and a
+    # float array cannot index one -- hence the explicit int.
+    j = np.clip(h, 1, 7).astype(int)
     return k + a[j] * (p - k) + (0.0 if b is None else b[j])
 
 

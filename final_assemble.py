@@ -75,7 +75,9 @@ if CAL:
     a = np.array([1.0] + [float(x) for x in CAL.split(",")])
     b = np.array([0.0] + [float(x) for x in CALB.split(",")]) if CALB else np.zeros(8)
     assert len(a) == 8 and len(b) == 8, "CALIB/CALIB_B need seven values, one per horizon"
-    j = np.clip(h, 1, 7)
+    # horizon is Float32 in the matrices (build_mats casts every feature), and a
+    # float array cannot index one -- hence the explicit int.
+    j = np.clip(h, 1, 7).astype(int)
     p = k + a[j] * (p - k) + b[j]
     print("calibration " + " ".join(f"h{i}={a[i]:.3f}" + (f"{b[i]:+.3f}" if CALB else "")
                                     for i in range(1, 8)))

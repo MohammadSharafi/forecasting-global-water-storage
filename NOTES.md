@@ -774,3 +774,51 @@ specialist and the windows) are already in the pipeline and already gated. This 
 the h=1 specialist is read as a structural fix rather than a hunch, and so nobody later "fixes"
 the empty window by making it inclusive of t_known -- that would double-count the anchor month
 at every horizon above 1 to buy a single month of flux at h=1.
+
+# Session 9o results — the integration run earned its keep: two real bugs
+
+Ran the whole orchestrator end to end in the cloud container against a structurally faithful
+synthetic dataset (real column names, .5-centred grid, the real month calendar with GRACE gaps,
+the six real test blocks at their real dates, 1600 cells so it finishes in two hours). All
+thirteen phases completed. Everything below was found by that run and nothing else would have
+found it before the deadline.
+
+## Bug 1 (submission-blocking): horizon is Float32, and a float cannot index an array
+`build_mats.py` casts every feature to Float32 on write, and `horizon` is a feature. So
+`va["horizon"].to_numpy()` is float32 in EVERY matrix -- A, B, C and FINAL. Both postcal.py and
+final_assemble.py applied the per-horizon calibration as `a[np.clip(h, 1, 7)]`, which raises
+
+    IndexError: arrays used as indices must be of integer (or boolean) type
+
+postcal crashed outright, so no calibration was produced. Worse, final_assemble carries the same
+line: the moment postcal DID adopt a calibration, assembling the submission would have died --
+and it would have died at the very end of a long run, after the training was done. Fixed with an
+explicit .astype(int) in both, verified by assembling with the scale-only form and with the
+affine form. Everything else that touches horizon (hsplice, stack, analyze, smooth.horizon_w,
+run_models' HFILT) compares or casts rather than indexing, so nothing else was affected.
+
+## Bug 2: layout C only runs the finalists, but phase 3b asked it for the whole grid
+eval_mix raises on the first missing tag, so the C table was lost entirely rather than partly.
+Phase 3b now asks C for e1/e4/e8 only. Cosmetic -- the step is `|| true` -- but the C table is
+the whole reason C exists, and it was silently absent from the report.
+
+## What the run confirms works
+- all three layouts build with the full feature set (201 features: 44 anomaly, 7 zonal, 12 anchor
+  columns including the 1500/2500 km radii)
+- validation_c reproduces the test horizon mix EXACTLY: h1 .333 h2 .222 h3 .167 h4 .111
+- data_report derives the block structure from Test.csv and cross-checks eval_mix: MATCH
+- select_config chose DROPF='' / lgb / ramp -- the same configuration the entrant's real run chose
+- stack.py fitted a genuine four-family ensemble: lgb .375, xgb .213, lgbm .160, cat .252,
+  which is the first time this project has used more than two families with fitted weights
+- smooth_scan turned smoothing OFF on this data (w=0) -- correct, the synthetic residuals are
+  near-white, and it shows the scan is capable of rejecting the incumbent rather than only tuning it
+- postcal's three-way choice works: after the fix it adopts the scale form over the affine one on
+  the held-out average and leaves FINAL_CALIB_B empty
+- compliance.py: every check passed, including clim_next reproducing a history-only climatology
+- four submission files written, and report_night produced a 35 kB RUN_REPORT.md in 23 sections
+
+## Consequence for a run already in flight
+Neither bug aborts a run: both steps are `|| true`. A run that hit them completes and produces
+valid submissions, just WITHOUT the calibration stage and without the layout-C table. Recovery is
+free because failed steps never write a marker: `git pull` and rerun the same command. Only the
+two failed steps and the assembles repeat; every training run is skipped.
