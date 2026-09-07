@@ -236,3 +236,8 @@ more than blend tuning can explain, so the gap is structural.
 - REQUIRES a matrix rebuild (build_mats.py A|B|FINAL) and then add_anchor_feats.py A|B|FINAL, since
   the anchor parquets are row-aligned to the matrices. Memory: ~34 extra float32 columns is ~630 MB
   on the 4.6M-row FINAL matrix -- keep PER_ROW=2 and run the build with nothing else alongside.
+- pipeline12.sh: the whole session-9c chain unattended -- preflight, backup of the pre-anomaly
+  predictions and CSVs, rebuild A/B/FINAL + anchor feats, lgb ablation with/without the anomaly
+  features on BOTH layouts with a printed ADOPT/DO-NOT-ADOPT verdict, then FINAL lgb+xgb at 5 seeds
+  each (cat and mlp dropped per the family ladder) and two submission files (with and without the
+  grid smooth). lgb rounds are taken from layout A's early stopping rather than the stale 560.
