@@ -3,3 +3,8 @@ out/
 __pycache__/
 *.csv
 *.ipynb_checkpoints
+
+# data & noise
+external/
+.DS_Store
+catboost_info/

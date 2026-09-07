@@ -1,0 +1,14 @@
+{
+ "kg_co2e_per_model": {
+  "lgb_allnoll": 0.0005527128430963192,
+  "xgb_allnoll": 0.0006037644235542449,
+  "cat_allnoll": 0.0021977686211118695,
+  "mlp_allnoll": 5.613531132111596e-07,
+  "lgb_v5x_noll": 0.0005873598627034979,
+  "xgb_v5x_noll": 0.0008502367501787577,
+  "cat_v5x_noll": 0.002810315367453724,
+  "mlp_v5x_noll": 6.975369568686999e-05
+ },
+ "total_one_seed_each": 0.007672472916898494,
+ "note": "final ensemble = 3 lgb + 3 xgb + 2 cat + 4 mlp seeds per anchor set"
+}
