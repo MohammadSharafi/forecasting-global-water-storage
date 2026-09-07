@@ -315,3 +315,18 @@ comparison is paired and clean.
   Independent selection ignores interactions -- it is a heuristic and the printed table is the
   evidence for overriding it. Selector verified on two synthetic fixtures: it recovers planted
   winners, and it correctly refuses a candidate that wins on layout A but loses on B.
+- Literature pass (session 9d). The Bayesian-network feature-selection study for global TWSA
+  reconstruction (ESSD) ranks CLIMATE/LSM-SIMULATED TWSA as the top predictor, selected for 71%
+  of grid cells, ahead of ONI at 56%. Our pipeline had every component of that quantity (ERA5
+  and NCEP soil water, snow water equivalent) but NEVER THEIR SUM -- and a tree can split on each
+  but cannot add them. features_anom.add_mtws now forms it: e5MTWS = e5SW*1000 + e5SWE and
+  MTWS = SW + SWE (units checked: ERA5's soil column is metres of water, NCEP's is mm), z-scored
+  per cell like any other storage variable. an_e5MTWSz_d -- the standardised change in modelled
+  storage over the unobserved window -- is the closest legal analogue of the GRACE change itself.
+  Bundled into the an_ prefix, so DROPF=anom ablates it with the rest.
+- Also from the literature, NOT adopted: SST fields / teleconnections help at longer leads but
+  fail for the same reason ONI already failed here (few independent cycles, doubles as a month
+  id). "Annual memory in the terrestrial water cycle" (HESS 2025) finds memory absent in
+  precipitation but strong in water stores, and warns that short-lag autocorrelation is a poor
+  predictability indicator under strong interannual variability -- already covered by lag12,
+  tws_ly, mean24 and rmean60.

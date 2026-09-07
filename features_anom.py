@@ -89,10 +89,26 @@ def add_anom(r, atab, storage_z, flux_z):
     return r, feats
 
 
+def add_mtws(tab, soil, snow, out, soil_scale=1.0):
+    """Modelled total water storage = soil water + snow water equivalent, in mm.
+
+    Every reanalysis feature so far keeps these two apart, and a tree can split on each but
+    cannot add them, so the quantity the literature reports as the single strongest predictor
+    of GRACE TWSA -- the land-surface model's own total storage -- was never available to the
+    model. Its z-scored change over the unobserved window (`an_<out>z_d`) is the closest legal
+    analogue of the GRACE change being predicted.
+
+    soil_scale converts the soil term to millimetres: ERA5's column is metres of water
+    (volumetric fraction x layer thickness), NCEP's is already mm."""
+    if tab is None or soil not in tab.columns or snow not in tab.columns:
+        return tab
+    return tab.with_columns((pl.col(soil) * soil_scale + pl.col(snow)).alias(out))
+
+
 # which covariates behave like a stored quantity and which like a flux
-ERA5_STORAGE = ["e5SW", "e5SWE", "e5T2M"]
+ERA5_STORAGE = ["e5SW", "e5SWE", "e5T2M", "e5MTWS"]
 ERA5_FLUX = ["e5P", "e5E", "e5R", "e5PER"]
-NCEP_STORAGE = ["SW", "SWE"]
+NCEP_STORAGE = ["SW", "SWE", "MTWS"]
 NCEP_FLUX = ["P", "E", "R", "PER"]
 COV_STORAGE = ["SOIL_MOISTURE_t"]        # SPEI is already a standardised index; soil moisture is not
 PFX = "an_"                              # every feature built here starts with this, so it can be ablated

@@ -10,7 +10,7 @@ from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, ERA5F
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
-from features_anom import build as anom_build, add_anom, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
+from features_anom import build as anom_build, add_anom, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 from features_scale import add_scale, SCALE
 L=sys.argv[1]; os.makedirs("out/mats",exist_ok=True); t0=time.time()
 tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
@@ -46,6 +46,9 @@ sums=clim_sums(hist); _,cell=cell_stats(hist); resp=cell_response(hist)
 # Climatologies for the covariate anomalies come from HISTORY MONTHS ONLY, so no month at or
 # after a prediction target can enter them.
 HM=hist["time"].unique().to_list()
+# modelled total water storage: soil water + snow, the predictor the literature ranks first
+ERA=add_mtws(ERA,"e5SW","e5SWE","e5MTWS",1000.0)   # e5SW is metres of water, e5SWE is mm
+nc =add_mtws(nc, "SW",  "SWE",  "MTWS")            # both already mm
 ANOM=[x for x in (anom_build(ERA,ERA5_STORAGE,ERA5_FLUX,HM),
                   anom_build(nc,NCEP_STORAGE,NCEP_FLUX,HM),
                   anom_build(cov_all.select(["lat","lon","time"]+COV_STORAGE).unique(["lat","lon","time"]),COV_STORAGE,[],HM)) if x is not None]
