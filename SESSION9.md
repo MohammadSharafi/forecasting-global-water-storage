@@ -15,11 +15,15 @@ the bottom.
 - **5 submissions/day, 200 overall.** Probes are not scarce; the constraint is calendar days
   left, not submission budget. Spend them on probes that separate hypotheses, not on
   re-uploading near-identical blends.
+- **Close: 13 September 21:59; code review of the top TWENTY; results by 4 October.** The
+  review threshold moved from 10 to 20 (organiser email, 7 Sep), so the odds that this entry
+  is code-reviewed went up substantially. Every compliance decision in §4 of `REPORT.md` is
+  now more likely to be read, and the repository itself has to be runnable by a stranger.
 
 I could not read the competition page or the discussion board directly: `zindi.world`,
-`zindi.africa` and `qiita.com` are all blocked by this session's egress policy. The two
-figures above come from search-engine extracts of the competition page. **I have not verified
-the close date** — that is the one input I am missing for the schedule below.
+`zindi.africa` and `qiita.com` are all blocked by this session's egress policy. The 50/30/20
+split and the submission limits come from search-engine extracts of the competition page; the
+close date and the top-20 review come from the organiser email.
 
 ## 2. Reading the leaderboard record properly
 
@@ -149,7 +153,28 @@ mid-competition, but the report should not quote an `EPOCHS>1` MLP validation fi
   compounds error over seven steps. Not worth the days.
 - **Seasonal forecast covariates (C3S SEAS5).** Ruled out by the same E2 result.
 
-## 4. Run order
+## 4. Schedule to 13 September
+
+Six days, ~30 submissions available, and the binding constraint is the machine: the memory
+rule is one heavy process at a time, and a FINAL 12-model retrain is hours, not minutes. So
+the ordering below front-loads everything that needs no retraining and puts the one retrain
+early enough that its leaderboard answer arrives with days to spare.
+
+| day | compute | uploads |
+|---|---|---|
+| **Mon 7** | `postproc2.py` scan on A and B (minutes). Then start `ANCHOR_TARGET=decay` lgb on A, then B, sequentially. Extra long-term-stack seeds overnight. | `sub_k_gc` at the (radius, beta) that wins both layouts, plus one more conservative beta to bracket it — 2 probes that isolate §3.1 |
+| **Tue 8** | If `decay` beat `lgb v5x_noll_sa` (A 0.6463 / B 0.5630) on **both** layouts, launch the FINAL 12-model train with `TAG=_ct`. | the extra-seed rebuild of the best recipe |
+| **Wed 9** | finish the `_ct` train | `_ct` stack alone, and 50/50 with the long-term stack — these two separate "is the climatology anchor better" from "does it blend well" |
+| **Thu 10** | — | interpolate the blend weight from Wed's two results; 2–3 probes, each checked with `lb_se.py` before believing it |
+| **Fri 11** | last new ideas; then **freeze** the feature and model set | 1–2 confirmations |
+| **Sat 12** | final maximum-seed rebuild of the chosen recipe; re-run CodeCarbon on it; update `REPORT.md` §3 and §5.4 and `NOTES.md` | the final file — upload it and check it scores where you expect |
+| **Sun 13** | nothing new | pick the two private-leaderboard entries with hours to spare |
+
+Freeze on Friday rather than Saturday if anything slips. A recipe that is 0.001 better but
+whose report and code are rushed is a bad trade when the leaderboard is half the score and
+the top twenty get read.
+
+## 4b. Commands
 
 ```sh
 # 1. post-processing scan, both layouts, no retraining (minutes)

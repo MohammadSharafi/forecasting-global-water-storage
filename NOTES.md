@@ -177,3 +177,9 @@ Noise regime check (information at <= t only): RMS of the cell's deviation from 
   50% of the final score, trustworthiness 30%, innovation 20%; 5 submissions/day, 200 overall.
   Close date NOT verified.
 - Full write-up and run order: SESSION9.md.
+- Deadline confirmed (organiser email, 7 Sep): closes 13 Sep 21:59; code review now covers the top
+  TWENTY (was top 10); results by 4 Oct. Trustworthiness rubric (Trustworthiness_Evaluation.pdf) has
+  four <=100-word sections -- bias, transparency (LIME/SHAP + figures), reusability, sustainability
+  (CodeCarbon) -- all four already covered by REPORT.md section 5. Day-by-day schedule in SESSION9.md.
+- pipeline*.sh had the author's absolute macOS path hardcoded, so none of them would run for a
+  reviewer. Now `cd "$(cd "$(dirname "$0")" && pwd)"` with `PY=${PY:-./.venv/bin/python}`.

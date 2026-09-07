@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs after the FINAL matrix exists: MLP recipe checks, CatBoost lr check, FINAL seeds, then U-Net on A.
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"
-PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"
+PY=${PY:-./.venv/bin/python}
 while pgrep -f "build_mats.py FINAL" >/dev/null; do sleep 20; done
 [ -f out/mats/FINAL_tr.parquet ] || { echo "FINAL matrix missing" > out/mats/pipeline2.err; exit 1; }
 EPOCHS=1 TAG=_e1 $PY run_models.py A mlp all > out/mats/A_mlp_all_e1.log 2>&1

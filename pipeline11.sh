@@ -1,5 +1,5 @@
 #!/bin/sh
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"; PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 until [ -f out/mats/p10.final ]; do sleep 60; done
 export WEIGHTS=uniform; FS=v5x_noll_sa; T=_u
 for L in A B; do TAG=$T $PY run_models.py $L lgb $FS > out/mats/${L}_lgb_${FS}_u.log 2>&1; done

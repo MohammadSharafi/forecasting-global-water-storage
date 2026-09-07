@@ -1,5 +1,5 @@
 #!/bin/sh
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"; PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 for L in A B; do $PY run_models.py $L lgb allnoll > out/mats/${L}_lgb_allnoll.log 2>&1; $PY run_models.py $L lgb v5x_noll > out/mats/${L}_lgb_v5x_noll.log 2>&1; done
 echo "val done" > out/mats/p8.val
 for FS in allnoll v5x_noll; do

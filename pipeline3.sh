@@ -1,5 +1,5 @@
 #!/bin/sh
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"; PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 until grep -q "all done" out/era5_download.log; do sleep 30; done
 mkdir -p out/mats_noera && cp out/mats/*.parquet out/mats/feats.json out/mats_noera/ 2>/dev/null
 for L in A B FINAL; do $PY build_mats.py $L > out/mats_${L}_era5.log 2>&1; done

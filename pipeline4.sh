@@ -1,5 +1,5 @@
 #!/bin/sh
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"; PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 until [ -f out/mats/p3.val ]; do sleep 30; done
 pkill -f pipeline3.sh; sleep 2; pkill -f "run_models.py FINAL"; sleep 5
 PER_ROW=2 $PY build_mats.py FINAL > out/mats_FINAL_era5.log 2>&1

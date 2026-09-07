@@ -1,5 +1,5 @@
 #!/bin/sh
-cd "/Users/moe/Programming/Forecasting Global Water Storage Challenge by ITU"; PY=./.venv/bin/python
+cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 until [ -f out/mats/e5only.done ]; do sleep 30; done
 for L in A B; do $PY run_models.py $L lgb e5only_noll > out/mats/${L}_lgb_e5only_noll.log 2>&1; SEED=0 EPOCHS=1 TAG=_e1 $PY run_models.py $L mlp e5only_noll > out/mats/${L}_mlp_e5only_noll_e1.log 2>&1; $PY run_models.py $L lgb e5only_v5x_noll > out/mats/${L}_lgb_e5only_v5x_noll.log 2>&1; done
 echo "val done" > out/mats/p7.val
