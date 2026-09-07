@@ -376,3 +376,27 @@ This changes the objective and invalidates earlier advice in this file:
 - Open question with large leverage: session 3/6 concluded the 0.56-0.63 public scores are
   legacy artifacts of the mismatched data release. If they collapse when re-scored against the
   current private targets, several ranks come free; if they are real, the top is unreachable.
+
+# Session 9g — LEADERBOARD SNAPSHOT (7 Sep, from the entrant): rank 82 of the public board
+Top: 1 MOHAR 0.5596 | 2 Shankar 0.5893 | 3 lode4 0.6231 | 4 GIrum 0.6234 | 5 Jisoo 0.6317 |
+6 OverfitStorage 0.6319 | 7 Emo HedgeHog 0.6474 | 8 Ahsan_496 0.6518 | 9 awxlong 0.6534 |
+10 Ramjas 0.6559 | 11 MosCraciunXXX 0.6592 | 12 H2-Oh 0.6611
+Around us: 73 fishnchips 0.70505 | 74 AbolfazlB 0.70514 | 75 Verlon 0.70605 | 76 medamin 0.70634 |
+77 Milan 0.70644 | 78 IvanTeselskyi 0.70711 | 79 Aqua Vectors 0.70774 | 80 kdylkykdylky 0.70782 |
+81 Kingstone 0.70896 | 82 mrSharafi 0.70926
+- Reaching the DISPLAYED top 10 needs -0.0533, from 0.7093 to 0.6559. The compliant frontier is
+  ~0.70 (confirmed by the dense cluster at ranks 73-82), so that is not achievable legitimately.
+- LOCAL RANK DENSITY is the real lever: ranks 73-82 span 0.0042 over 9 ranks = 0.00047 RMSE per
+  rank. A 0.005 gain is worth roughly 10 ranks, a 0.015 gain roughly 30 (thinning higher up).
+  This is the tightest part of the board and we sit at the bottom of it.
+- STALE-SCORE HYPOTHESIS (entrant's, and supported by our own session-6 forensics): the sub-0.66
+  scores are pre-fix/v2-era. Anchor: the starter recipe scored 0.659 on v2 and 0.900 on the
+  current data, a shift of about +0.24 for the same method. Applying it, rank 1 becomes ~0.80,
+  rank 5 ~0.87, rank 10 ~0.90 -- all well behind us. If Zindi computes the private board fresh
+  against current targets (which is the normal mechanism, since a stored public score is not
+  recomputed when the target file changes), those entries collapse and the ~10-person cluster at
+  0.705-0.709 is the real field.
+- UNVERIFIED and outside our control: we cannot see submission dates, so we cannot confirm which
+  entries are stale. Strategy does not depend on it -- maximising the score maximises rank under
+  both scenarios -- but the EXPECTATION does: "top 10 on the current public board" is out of
+  reach, while "top of the current-data cluster" is live and needs only 0.005-0.015.
