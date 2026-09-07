@@ -307,3 +307,11 @@ comparison is paired and clean.
 - If it lands >= 0.709, that is the important negative result: a -0.014 gain on BOTH layouts
   buying nothing would mean the validation->LB link is broken, and the remaining days are better
   spent on the report (50% of the final score) than on more validation-driven modelling.
+- run_all.sh + select_config.py: one unattended command for the overnight run. Order is
+  (1) eval_mix on the 9c ablation BEFORE anything is rebuilt, since pipeline13 overwrites the
+  matrices those predictions are aligned to, (2) the pipeline13 grid, (3) select_config.py picks
+  features / capacity / weights independently, each requiring a win on BOTH layouts under the
+  test horizon mix and keeping the incumbent otherwise, (4) pipeline14 builds the submission.
+  Independent selection ignores interactions -- it is a heuristic and the printed table is the
+  evidence for overriding it. Selector verified on two synthetic fixtures: it recovers planted
+  winners, and it correctly refuses a candidate that wins on layout A but loses on B.
