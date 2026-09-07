@@ -1,6 +1,15 @@
 """Train one model family on cached matrices. usage: python run_models.py LAYOUT MODEL FEATSET [rounds]
 LAYOUT: A|B|FINAL   MODEL: lgb|lgbd|xgb|cat|mlp   FEATSET: v6n|all|v5|allx
-Writes out/mats/pred_{LAYOUT}_{MODEL}_{FEATSET}.npy (val/test predictions in the va parquet row order)."""
+Writes out/mats/pred_{LAYOUT}_{MODEL}_{FEATSET}_s{SEED}{TAG}.npy (predictions in the va parquet row order).
+
+env ANCHOR_TARGET selects what the residual target is measured against (session 9):
+  tws    (default)  y = target - tws_known            -> persistence-anchored, shrinks to the last observation
+  clim              y = target - clim_next            -> climatology-anchored, shrinks to the long-term normal
+  decay             y = target - (lam*tws_known + (1-lam)*clim_next), lam = ANCHOR_RHO**horizon
+The leaderboard has said twice that this test period rewards long-term anchors over recent
+ones (recent-anchor stacks 0.7191, long-term 0.7110), and the anchor a model is trained
+against sets its shrinkage far more directly than any feature can.  Use TAG to keep the
+prediction files apart, e.g. ANCHOR_TARGET=decay TAG=_ct."""
 import polars as pl, numpy as np, sys, time, gc, json, os
 from features2 import FEATS2
 from features4 import AR
@@ -24,21 +33,32 @@ if FS.endswith("_sa"): FS=FS[:-3]
 SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
       "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL_noll":[f for f in ALL if f not in ("lat","lon")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")]}
 F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])
-tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
+AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
+def base_of(df):
+    """What the residual target is measured against (and what the prediction is added back to)."""
+    k=df["tws_known"].to_numpy().astype(np.float64)
+    if AT=="tws": return k
+    c=df["clim_next"].to_numpy().astype(np.float64); c=np.where(np.isfinite(c),c,k)
+    if AT=="clim": return c
+    if AT=="decay":
+        lam=RHO**df["horizon"].to_numpy().astype(np.float64); return lam*k+(1.0-lam)*c
+    raise SystemExit(f"unknown ANCHOR_TARGET={AT}")
+tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
 if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
 seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))
 if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
-X=tr.select(F).to_numpy(); y=(tr["target"]-tr["tws_known"]).to_numpy().astype(np.float32)
+X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
 if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)   # no recent-year emphasis (test regime differs from the last training years)
 del tr; gc.collect()
-va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
+va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
 if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
 if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
-Xv=va.select(F).to_numpy(); kv=va["tws_known"].to_numpy(); yv=va["target"].to_numpy() if L!="FINAL" else None; del va; gc.collect()
+Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if L!="FINAL" else None; del va; gc.collect()
+if AT!="tws": print(f"  anchor target: {AT}" + (f" rho={RHO}" if AT=="decay" else "") + f", base mean {kv.mean():+.4f}",flush=True)
 print(f"{L} {M} {FS}: X {X.shape} Xv {Xv.shape} ({time.time()-t0:.0f}s)",flush=True)
 seed=int(os.environ.get("SEED","0"))
 def report(p,tag=""):

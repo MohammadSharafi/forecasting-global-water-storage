@@ -151,3 +151,29 @@ Noise regime check (information at <= t only): RMS of the cell's deviation from 
 | family split of the long-term stack | sub_i_lt_trees (lgb .4 xgb .4 cat .2), sub_i_lt_mlp, sub_i_lt_lgbxgb | | LB probes: is the MLP what fails in the test regime? |
 | uniform training weights (no recent-year ramp) for the long-term stack | pipeline11 running | | LB probe (test regime punishes trend extrapolation) |
 | uniform weights, long-term lgb | A 0.6470 (ramp 0.6463), B 0.5664 (ramp 0.5630) | validation prefers the ramp, as expected for the drying layouts | sub_j_lt_uniform built (12 models) — LB decides |
+
+# Session 9 — leaderboard statistics, post-processing shape, anchor target (no data in this environment; nothing here is measured)
+- LB significance has a closed form: SE(gap) ~= RMS(pB-pA)/sqrt(N_public), N_public ~= 84,288 (`lb_se.py`).
+  Recent-vs-long-term (0.0081 gap, RMS diff ~0.11) = ~21 SE: certain. sub_h_l7_rb vs sub_g_longterm
+  (0.00037, RMS diff ~0.04) = ~2.7 SE: marginal. Check every future sub-0.001 difference with it.
+- The anchor-philosophy axis is the ONLY effect above ±0.001 found on this test set. Push along it
+  rather than hunting features.
+- `final_assemble.py`'s final filter is a grid box on the residual: latitude-dependent width, and it
+  leaves all of tws_known's fine-scale noise in the prediction. `postproc2.py` scans the physically
+  correct operator instead -- p -> M_r(p) + beta*(p - M_r(p)) on the target-month prediction field,
+  great-circle radius, closed-form beta -- on both layouts. Subsumes the grid smooth and the re-base
+  (whose a=0.3 at 300 km was never scanned, though session 7's own numbers favour 500 km and a ~0.8).
+  Smoke-tested on a synthetic smooth-field+white-noise case: closed form matched the grid minimum at
+  every radius, 0.4252 -> 0.3198 against a 0.3002 oracle. Applied by `final_assemble2.py`.
+- `run_models.py` gained ANCHOR_TARGET=tws|clim|decay: what the residual target is measured against.
+  `decay` (lam = ANCHOR_RHO**horizon) keeps h=1 near persistence and pulls long horizons toward the
+  long-term normal -- the direction the LB has twice rewarded, expressed in the target rather than in
+  the feature set. clim_next is LOYO for training rows, so no leakage; no matrix rebuild needed.
+- Free and risk-free: more seeds on the long-term stack (MLP is 1 epoch, highest variance, weight 0.25).
+- Known bug, left alone mid-competition: the MLP branch picks its best epoch using yv, so any layout
+  A/B MLP number from an EPOCHS>1 run is optimistically biased (pipelines mostly use EPOCHS=1, where
+  no selection happens). Do not quote such a figure in the report.
+- Competition structure confirmed by search (zindi.world itself is egress-blocked here): LB RMSE is
+  50% of the final score, trustworthiness 30%, innovation 20%; 5 submissions/day, 200 overall.
+  Close date NOT verified.
+- Full write-up and run order: SESSION9.md.
