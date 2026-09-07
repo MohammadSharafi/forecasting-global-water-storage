@@ -165,4 +165,10 @@ elif M=="mlp":
         if yv is not None and (ep==0 or np.sqrt(np.mean((yv-p)**2))<best): best=float(np.sqrt(np.mean((yv-p)**2))); pbest=p.copy()
     if yv is not None: p=pbest
     torch.save({"state":net.state_dict(),"mu":mu,"sd":sd,"med":med,"ysd":ysd,"F":F},f"out/mats/model_{L}_{M}_{FS}_s{seed}.pt")
+# record exactly which features this run used, so compliance.py can audit the submitted model
+# rather than the feature SUPERSET in feats.json (which contains lat/lon and every ablated group)
+json.dump({"layout":L,"model":M,"featset":FS,"tag":os.environ.get("TAG",""),"dropf":sorted(DROPF),
+           "anchor_target":AT,"weights":os.environ.get("WEIGHTS","ramp"),"hmix":os.environ.get("HMIX",""),
+           "hfilt":HFILT,"n_features":len(F),"features":F},
+          open(f"out/mats/used_{L}_{M}_{FS}{os.environ.get('TAG','')}.json","w"))
 np.save(f"out/mats/pred_{L}_{M}_{FS}_s{seed}{os.environ.get('TAG','')}.npy",p); print("saved",flush=True)

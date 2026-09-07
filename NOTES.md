@@ -581,3 +581,87 @@ the h=1..7 it would be applied to. Dropped, with the reasoning recorded so it is
 - Three control files are now produced beside the main one: `sub_q_main_nosm` (no smoothing at
   all) and `sub_q_main_nocal` (tuned smoothing, no calibration). If the leaderboard disagrees
   with validation about the post-processing, those two say which stage caused it.
+
+# Session 9n — the run now explains itself: data, error anatomy, stacking, and an audit
+
+The complaint this answers: a run produced a submission and a number, and nothing else. No
+description of the data, no account of where the error actually is, no record of why each choice
+was made, and nothing a code reviewer could read. Five additions.
+
+## 1. data_report.py — what is actually in the files
+Every design decision in this project rests on beliefs about the test file's structure that were
+inferred once, by hand, and never re-derived. This derives them:
+ - the BLOCK STRUCTURE read off Test.csv -- run lengths, the gaps between blocks, which months
+   carry an observed TWS -- and cross-checks it against eval_mix.TEST_BLOCKS. If those disagree,
+   the horizon weighting, HMIX=test and layout C are all wrong, and until now nothing would have
+   noticed. It prints MATCH or a loud MISMATCH.
+ - GRACE gaps in train, cells per month, coverage
+ - per-era TWS statistics, so the size of the 2002-2015 -> 2015-2018 regime shift is a measured
+   number rather than an assumption, plus the sd of the month-to-month global mean change, which
+   is the hard bound on what any global-offset correction could ever buy
+ - seasonal amplitude and the seasonal share of variance per latitude band (what climatology alone
+   can do), and lag-1 autocorrelation and mean |one-month change| (the bar any h=1 model must beat)
+ - covariate null rates, so a 40%-missing feature is not mistaken for a weak one
+
+## 2. analyze.py — where the error is
+Every number ever quoted here was a single RMSE, which says whether a change helped and never
+where the error lives. This decomposes the residuals by horizon (with each horizon's share of the
+TEST-weighted MSE, the only ranking that says where effort pays), by latitude band, by the cell's
+own variability, by calendar month, and as a band x horizon matrix. Two rows matter most:
+ - "model is worse than the last observation on X% of rows", per horizon. A model losing to
+   persistence on a third of rows has a routing problem, not an accuracy problem.
+ - the residual VARIOGRAM: correlation of the residual with its neighbour at grid lags 1, 2, 3, 5,
+   8. If residual correlation survives at lag 2-3 there is more for spatial smoothing to take; if
+   it is gone by lag 1, smoothing is finished and smooth_scan will find nothing. This is the first
+   direct measurement of that, after four sessions of tuning a smoother blind.
+
+## 3. stack.py — the ensemble weight is a vector, not a scalar
+blend_scan tunes one number, lgb against xgb. That is the right question only while there are two
+members. With a 31-leaf LightGBM, a 63-leaf one and CatBoost also trained -- each failing
+differently on the regime shift, which is exactly why the leaderboard's family ladder ran opposite
+to validation -- the answer is a weight vector. Non-negative least squares on the test-mix-weighted
+rows, renormalised to sum to 1 so the overall SCALE stays postcal's job, pulled halfway back to
+the incumbent blend, and adopted only if the leave-one-layout-out gain clears 0.0003 everywhere.
+The incumbent is evaluated over the SAME member list with zero weight on the newcomers, so
+"adopted" means better than what would otherwise be submitted, never better than an equal-weight
+blend nobody proposed.
+
+## 4. compliance.py — the audit the code review will do
+Checked against the ARTEFACTS, not against what the code is believed to do:
+ - the exact feature list each run used (run_models.py now writes out/mats/used_*.json), audited
+   for lat/lon. feats.json is the SUPERSET and does contain lat/lon by design, so auditing it
+   would have been meaningless -- which is why this needed a new artefact.
+ - t_known <= t and horizon == months(t_known -> t) + 1 for every row
+ - tws_known equals the observed TWS at t_known, reconstructed independently from Train.csv and
+   the unmasked Test.csv rows
+ - clim_next recomputed from history ALONE and compared to the matrix column. Agreement is a
+   direct test that no test-era month entered the climatology -- a measurement of R2, not a
+   reading of the code. Verified on a fixture: sabotaging the climatology with test months is
+   detected (max difference 2e-1), and so is adding lat/lon to the feature list.
+ - an inventory of external/, and a grep for the patterns that have caused problems before
+
+## 5. report_night.py — one file at the end
+out/RUN_REPORT.md: the configuration and the held-out evidence behind every adopted change first,
+then the grid, then the data and error analysis, then the audit. This is most of what a code
+review needs, written as the run happened rather than reconstructed afterwards.
+
+## A real bug this batch fixed
+blend_scan was being called as `blend_scan.py ${FM}_v5x_noll xgb_v5x_noll _bw`, but only xgb was
+ever trained under the tag `_bw` -- the lgb side was tagged `_e8`. The lgb predictions did not
+exist under that tag, so the scan would have found nothing and silently kept 50/50, and every
+later post-processing scan would have been fitted on the wrong pair. Phase 5 now trains EVERY
+family, including the chosen one, on the chosen configuration under the single tag `_bw`. This
+also matters beyond the bug: the chosen configuration can differ from any single grid experiment
+(features from e4, capacity from e5, uniform weights), so no grid tag ever names it.
+
+## Orchestrator
+New phases: 1 data_report, 5 all families on the chosen configuration under one tag, 5b stacking
+between the blend scan and the smoothing scan, 5c the error anatomy per layout, 9 compliance +
+report. WIDE=1 (implied by DEEP=1) adds CatBoost and the other capacities so the stack has
+something to fit. `rd()` takes each family's boosting rounds from what early stopping chose for
+THAT family on the chosen configuration, instead of reusing lgb's count for everything.
+
+## Still open before submitting
+requirements.txt lists lightgbm, polars and friends but not xgboost, catboost or scipy, all of
+which the run path imports. Deliberately not touched mid-competition -- a reinstall now is a risk
+not worth taking -- but run `pip freeze` and reconcile it before the code review.
