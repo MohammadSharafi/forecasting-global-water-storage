@@ -279,3 +279,31 @@ structure against the real test.
   worth revisiting only if the horizon breakdown shows a systematic long-horizon deficit.
 - pipeline13.sh runs the 7-experiment grid on both layouts and reports under the test mix;
   pipeline14.sh builds the submission from the chosen configuration.
+
+# Session 9c RESULT (7 Sep, measured on the real data) — covariate anomalies ADOPTED
+Matrices rebuilt with features_anom: 205 features, 34 of them anomalies (215 parquet columns).
+Row counts PER_ROW=2: A tr 2,971,466 / va 281,003; B tr 2,193,850 / va 312,102; FINAL tr 3,470,979.
+| layout | lgb without anomalies | with | delta |
+|---|---|---|---|
+| A | 0.6429 (best_iter 223, bias +0.0117) | **0.6307** (best_iter 255, bias +0.0118) | **-0.0122** |
+| B | 0.5615 (best_iter 178, bias +0.0636) | **0.5442** (best_iter 210, bias +0.0563) | **-0.0173** |
+VERDICT: ADOPT — wins on both layouts. This is the largest validation gain in the project's
+history: ERA5 as raw levels was worth 0.0016 and the smoothed anchor 0.0031, so this is 4-5x
+either, from the same lgb at similar depth (223 -> 255 rounds). Information, not capacity.
+Note the noanom reference (A 0.6429) differs from session 7's 0.6463 because the matrices were
+rebuilt with PER_ROW=2 for A and B; both ablation arms come from the same rebuild, so the
+comparison is paired and clean.
+- FINAL: lgb+xgb, 5 seeds each, 255/400 rounds -> out/sub_n_anom_lgbxgb.csv and
+  sub_n_anom_lgbxgb_nosm.csv (SMOOTH_W=0). Mean predicted change -0.0037 (lgb) / -0.0035 (xgb).
+- lb_se vs the 0.709259 file: RMS(difference) 0.1100, max |diff| 0.6517, SE 0.00038, so gaps
+  below 0.00095 are noise. RMS 0.11 is the same magnitude as the recent-vs-long-term anchor
+  switch (which was worth 0.008 on the LB): the anomalies moved the predictions substantially,
+  so the LB verdict will be unambiguous in either direction.
+- Prediction recorded BEFORE upload, for calibration: sub_n_anom_lgbxgb 0.704 (80% interval
+  0.698-0.710); sub_n_anom_lgbxgb_nosm ~0.001 worse, near a coin flip. Reasoning: the val->LB
+  transfer record here is erratic (smoothed anchor 1.3x, ERA5-raw ~0x, session-2 expansion
+  negative), so ~0.35x applied to -0.014. The ERA5-raw row is the same experiment done wrong,
+  which is the reason to expect better transfer this time.
+- If it lands >= 0.709, that is the important negative result: a -0.014 gain on BOTH layouts
+  buying nothing would mean the validation->LB link is broken, and the remaining days are better
+  spent on the report (50% of the final score) than on more validation-driven modelling.
