@@ -733,3 +733,44 @@ validation gain is 10-20x the noise threshold for this pair, and whether that ga
 public board decides everything else: if it transfers, the same features under the session-9m
 pipeline should go further; if it does not, the problem is the 2015-18 regime and the effort
 belongs in calibration and the ensemble rather than in more features.
+
+# Session 9o — measured on a full synthetic integration run: 38 features are dead at h=1
+
+Found while running the whole orchestrator end to end in the cloud container against a
+structurally faithful synthetic dataset (same column names, .5-centred grid, the real month
+calendar with GRACE gaps, and the six real test blocks at their real dates). Measured on the
+layout-A matrix, not reasoned about:
+
+  horizon   rows    the 14 '_acc' features      the 24 '_d' features
+    h=1     8000    100% NULL                   100% EXACTLY ZERO
+    h>=2     ...      0% NULL                     0% zero (sd ~0.6)
+
+Why, and why it is not a bug: a row's accumulation window is (t_known, t] and its difference is
+value(t) - value(t_known). At h=1, horizon = mdiff(t, t_known) + 1 = 1 means t_known == t, so the
+window is empty and every difference is identically zero. That is the truth about the data --
+at h=1 there is no gap to describe -- but the CONSEQUENCE was never noticed:
+
+  h=1 is 33.3% of the test, the largest single slice, and there 38 of the 201 features carry
+  no information whatsoever.
+
+Three things follow.
+
+1. THE HORIZON-1 SPECIALIST IS MUCH BETTER MOTIVATED THAN THE ARGUMENT IN SESSION 9m. That
+   argument was about h=1 being "a different problem". The real reason is mechanical: with
+   feature_fraction=0.6 a pooled model offers roughly 23 of those 38 dead features at every
+   split it makes on an h=1 row, so a fifth of its candidate set at the largest test slice is
+   guaranteed waste. A specialist trained with HFILT=1 never sees them.
+2. THE ANTECEDENT WINDOWS ADDED IN SESSION 9m ARE THE ONLY COVARIATE-DYNAMICS INFORMATION THE
+   MODEL HAS AT h=1. The 24 '_w3/_w6/_w12/_m3/_m6/_m12' features are 0% null at every horizon
+   including h=1, because their window ends at t and does not depend on t_known at all. They
+   were built for drought memory; it turns out they also fill a hole that had been open since
+   session 2 and that nothing else covers.
+3. It is consistent with the grid's per-horizon table, where uniform weights (e7) were the best
+   variant at h=1 on layout A by a wide margin (-0.0224 against the base) and lost everywhere
+   else. Whatever helps at h=1 is not what helps elsewhere.
+
+No code change: the features are correct, and the two mechanisms that exploit this (the
+specialist and the windows) are already in the pipeline and already gated. This is recorded so
+the h=1 specialist is read as a structural fix rather than a hunch, and so nobody later "fixes"
+the empty window by making it inclusive of t_known -- that would double-count the anchor month
+at every horizon above 1 to buy a single month of flux at h=1.
