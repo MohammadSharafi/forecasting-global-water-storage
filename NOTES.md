@@ -356,3 +356,23 @@ comparison is paired and clean.
    e5/e6 capacity, e7 uniform weights, e9 test horizon mix) and select_config makes four
    independent decisions, each requiring a win on BOTH layouts. Verified on a synthetic fixture
    with all four planted: it recovers each one and refuses the deliberately-worse uniform variant.
+
+# Session 9f — STRATEGY CORRECTION: the leaderboard is a GATE, not a weighted component
+Entrant states that after the private scores are published, only the TOP 10 go to code review.
+(The 7 Sep organiser email said "top twenty"; plan for 10, which is the stricter requirement.)
+This changes the objective and invalidates earlier advice in this file:
+- Previously framed as "LB RMSE is 50% of the final score, so a 0.002 gain is worth less than a
+  strong report". That is WRONG under a gate. Outside the top 10 the report is worth nothing at
+  all, because it is never evaluated. RMSE is both the qualifying filter AND 50% of the score
+  awarded afterwards, so it dominates completely until qualification is secure.
+- The objective is therefore no longer "maximise expected RMSE" but "maximise P(top 10)". Those
+  differ: when behind, the correct choice is the higher-variance candidate even at a worse mean;
+  when comfortably inside, the correct choice is the low-variance one.
+- Public-to-private sampling noise for the SAME file is about +-0.004 (SD ~0.002). If the top ten
+  are packed inside that, rank is substantially luck and the only defence is a clear margin.
+- REQUIRED INPUT that only the entrant can supply (zindi.world is egress-blocked from this
+  session): current public rank, and the scores at ranks 1-15. Without those the risk posture
+  cannot be chosen rationally.
+- Open question with large leverage: session 3/6 concluded the 0.56-0.63 public scores are
+  legacy artifacts of the mismatched data release. If they collapse when re-scored against the
+  current private targets, several ranks come free; if they are real, the top is unreachable.
