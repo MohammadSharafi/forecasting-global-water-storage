@@ -56,9 +56,11 @@ def anom_table(tab, cols, hist_months, pfx):
     # constant, so a cell SD near zero turns a rounding-level anomaly into a huge z-score.
     # Floor each cell's SD at 5% of the variable's global anomaly SD, fall back to the global
     # value where the cell has too little history, and clip the result.
-    g = {c: (ha[c + "_an"].std() or 1.0) for c in cols}
+    # float() matters: a numpy scalar here makes polars treat the floor as a length-1 Series,
+    # which then refuses to broadcast. clip(lower_bound=...) is also clearer than max_horizontal.
+    g = {c: float(ha[c + "_an"].std() or 1.0) for c in cols}
     t = t.with_columns([
-        pl.max_horizontal(pl.col(c + "_sd").fill_null(g[c]), pl.lit(0.05 * g[c])).alias(c + "_sde")
+        pl.col(c + "_sd").fill_null(g[c]).clip(lower_bound=0.05 * g[c]).alias(c + "_sde")
         for c in cols])
     t = t.with_columns([(pl.col(c + "_an") / pl.col(c + "_sde")).clip(-10, 10).alias(pfx + c + "z")
                         for c in cols])
@@ -86,6 +88,41 @@ def add_anom(r, atab, storage_z, flux_z):
             [pl.col(c).sum().alias(c + "_acc") for c in flux_z])
         r = r.join(acc, on=["lat", "lon", "time", "t_known"], how="left")
         feats += [c + "_acc" for c in flux_z]
+    return r, feats
+
+
+WINDOWS = (3, 6, 12)
+
+
+def add_anom_windows(r, atab, flux_z, storage_z, windows=WINDOWS):
+    """Fixed-length antecedent windows of the covariate anomalies, ending at t.
+
+    The `_acc` features accumulate over (t_known, t], whose length is the horizon -- so they
+    describe the gap, not the cell's condition. Drought is a memory process: what matters for
+    where storage sits is how wet or dry the cell has been over the last 3, 6 and 12 months,
+    regardless of when TWS was last seen. SPEI-3/6/12 supply exactly that for METEOROLOGICAL
+    drought and are among the strongest features in the model; nothing supplies it for the
+    actual water balance or for modelled storage.
+
+    flux_z    summed over the window (an accumulated anomaly, like _acc but fixed length)
+    storage_z averaged over the window (the mean state, not a sum)
+
+    These depend on (cell, t) only, not on t_known, so they are cheap: one group per cell-month.
+    Compliance: every month in the window is <= t, the same rule as every other covariate here."""
+    if not (flux_z or storage_z):
+        return r, []
+    feats = []
+    for W in windows:
+        w = atab.select(["lat", "lon", "time"] + flux_z + storage_z).rename({"time": "tw"})
+        j = (r.select(["lat", "lon", "time"]).unique()
+              .join(w, on=["lat", "lon"], how="inner")
+              .filter((pl.col("tw") <= pl.col("time")) &
+                      (pl.col("tw") > pl.col("time").dt.offset_by(f"-{W}mo"))))
+        agg = ([pl.col(c).sum().alias(f"{c}_w{W}") for c in flux_z] +
+               [pl.col(c).mean().alias(f"{c}_m{W}") for c in storage_z])
+        r = r.join(j.group_by(["lat", "lon", "time"]).agg(agg),
+                   on=["lat", "lon", "time"], how="left")
+        feats += [f"{c}_w{W}" for c in flux_z] + [f"{c}_m{W}" for c in storage_z]
     return r, feats
 
 

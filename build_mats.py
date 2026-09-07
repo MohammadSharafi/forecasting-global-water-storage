@@ -10,7 +10,7 @@ from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, ERA5F
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
-from features_anom import build as anom_build, add_anom, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
+from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 from features_scale import add_scale, SCALE
 L=sys.argv[1]; os.makedirs("out/mats",exist_ok=True); t0=time.time()
 tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
@@ -27,6 +27,7 @@ def feats(rows,cov_all,obs,sums,cell,resp,loyo):
     AF=[]   # per-cell standardised covariate anomalies (features_anom): the level features above
     for at,sz,fz in ANOM:   # are raw mm and unusable without lat/lon, which is not a feature
         r,f=add_anom(r,at,sz,fz); AF+=f
+        r,f=add_anom_windows(r,at,fz,sz); AF+=f   # 3/6/12-month antecedent windows ending at t
     F=FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF+SCALE
     F=list(dict.fromkeys(F)); return r,F
 if L=="FINAL":

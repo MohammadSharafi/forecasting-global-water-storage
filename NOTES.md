@@ -400,3 +400,20 @@ Around us: 73 fishnchips 0.70505 | 74 AbolfazlB 0.70514 | 75 Verlon 0.70605 | 76
   entries are stale. Strategy does not depend on it -- maximising the score maximises rank under
   both scenarios -- but the EXPECTATION does: "top 10 on the current public board" is out of
   reach, while "top of the current-data cluster" is live and needs only 0.005-0.015.
+
+# Session 9h — target set to 0.69 (-0.0193 from 0.709259). Extra independent gain source added.
+- ANTECEDENT WINDOWS (features_anom.add_anom_windows). The _acc features accumulate the covariate
+  anomaly over (t_known, t], whose LENGTH IS THE HORIZON -- so they describe the gap, not the
+  cell's condition. Drought is a memory process. SPEI-3/6/12 give exactly the fixed-window view
+  for METEOROLOGICAL drought and rank among the strongest features we have; nothing gave it for
+  the actual water balance or for modelled storage. Now: flux anomalies summed and storage
+  anomalies averaged over the 3, 6 and 12 months ending at t, independent of t_known.
+  ~48 new features. Verified on a synthetic cell with a planted 6-month dry spell: w3 recovers
+  exactly 3 dry months, w6 and w12 exactly 6, while _acc sees only the 2-month gap.
+- BUG FIXED in anom_table: pl.max_horizontal with a numpy scalar floor made polars treat the floor
+  as a length-1 Series that then refused to broadcast (it happened to survive on the real data
+  because many cells give the sd column full length, but it failed immediately on a small case).
+  Now float() + clip(lower_bound=...). Verified byte-identical output on a multi-cell fixture, so
+  nothing already computed changes.
+- MEMORY WARNING: the matrix is heading for ~260 features. On FINAL (3.47M rows) that is roughly
+  3.6 GB for the training frame before LightGBM's binned copy. Keep PER_ROW=2; drop to 1 on OOM.
