@@ -31,3 +31,56 @@ def traj_smooth(df, pred, w=0.35, causal=True):
     if causal: e=e.with_columns(pl.lit(None,dtype=pl.Float64).alias("rp"))   # only the previous horizon (information <= t) is used
     e=e.with_columns(pl.mean_horizontal(["rm","rp"]).alias("nb")).with_columns(pl.when(pl.col("nb").is_null()).then(pl.col("res")).otherwise((1-w)*pl.col("res")+w*pl.col("nb")).alias("res2")).sort("i")
     return (e["tws_known"]+e["res2"]).to_numpy()
+
+
+# ---------------------------------------------------------------------------------------------
+# session 9m: the same neighbourhood blend, but with a per-row weight, an explicit row order and
+# optional longitude wrap-around. `smooth` above hardcodes one scalar w for every row and drops
+# the dateline neighbours; both are now tunable (smooth_scan.py) rather than assumed.
+def nb_mean(df, res, radius=1, wrap=False):
+    """Mean of `res` over the 8 (or 24) grid neighbours at the same month, in row order.
+
+    Pulled out of smooth_field because one blending pass is LINEAR in the neighbour mean:
+    res' = res + w * (nb - res).  So a whole grid of blend weights -- including a different
+    weight per horizon -- can be scored from a single neighbour pass instead of one pass each,
+    which is what makes smooth_scan.py cheap enough to run on every configuration."""
+    d = (df.select(["lat", "lon", "time"]).with_columns(pl.Series("res", np.asarray(res, float)))
+           .with_row_index("_i"))
+    lo = int(df["lon"].min()); span = int(df["lon"].max()) - lo + 1
+    wrap = wrap and span >= 350
+    nb = []
+    for dl in range(-radius, radius + 1):
+        for dn in range(-radius, radius + 1):
+            if not (dl or dn):
+                continue
+            nb.append(d.select(["lat", "lon", "time", "res"]).with_columns(
+                (pl.col("lat") + dl).alias("lat"),
+                (((pl.col("lon") + dn - lo) % span + lo) if wrap
+                 else (pl.col("lon") + dn)).alias("lon")))
+    nb = pl.concat(nb).group_by(["lat", "lon", "time"]).agg(pl.col("res").mean().alias("nb"))
+    d = d.join(nb, on=["lat", "lon", "time"], how="left").sort("_i")
+    return d["nb"].fill_null(d["res"]).to_numpy()
+
+
+def smooth_field(df, pred, w, radius=1, iters=1, wrap=False):
+    """df: lat, lon, time, tws_known.   w: scalar, or one blend weight per row.
+
+    Per-row w exists because the right amount of smoothing is not the same at every horizon:
+    at h=1 the prediction is dominated by the cell's own observed state and blurring it in
+    costs signal, while at h=7 almost nothing is left but the regional mean, which is exactly
+    what the neighbourhood estimates.
+
+    wrap=True joins the cells either side of the dateline. On a global 1-degree grid the two
+    edge columns otherwise smooth against half a neighbourhood."""
+    k = df["tws_known"].to_numpy()
+    wv = np.full(len(df), float(w)) if np.isscalar(w) else np.asarray(w, dtype=float)
+    assert len(wv) == len(df)
+    res = np.asarray(pred, float) - k
+    for _ in range(iters):
+        res = res + wv * (nb_mean(df, res, radius, wrap) - res)
+    return k + res
+
+
+def horizon_w(h, w1, w7):
+    """Linear ramp of the smoothing weight from horizon 1 to horizon 7."""
+    return np.clip(w1 + (w7 - w1) * (np.asarray(h, float) - 1.0) / 6.0, 0.0, 1.0)

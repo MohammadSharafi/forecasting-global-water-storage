@@ -490,3 +490,94 @@ Run after the rebuild: python globalshift.py A lgb_v5x_noll ; python globalshift
 - Honest runtime: ~4 h default (SEEDS=8), ~8 h with DEEP=1 (16 seeds, 3 configs). There is not
   50 h of USEFUL work here -- seeds are 1/sqrt(n) so going past ~16 buys ~0.0003. The value of
   the resumability is being able to run it in chunks, not to fill wall-clock time.
+
+# Session 9m — four new post-processing ideas, a third validation layout, and the orchestrator
+## that runs them
+
+Everything below is fitted OUTSIDE the model, on predictions that already exist, so nothing here
+costs a training run. Each idea has its own gate, and each gate is leave-one-layout-out
+(`xfit.py`): the configuration is chosen on the other layouts and scored on the held-out one, and
+nothing is adopted unless every held-out gain clears 0.0003. Under 0.0003 a validation difference
+is inside seed noise, and at ~84k public rows a leaderboard difference below ~0.00014 is
+unreadable anyway (lb_se.py).
+
+## 1. The smoothing weight was never tuned  (smooth_scan.py, smooth.nb_mean, smooth.smooth_field)
+`final_assemble.py` has blurred the residual field over the 8 grid neighbours at w=0.7 since
+session 4. That number came from one coarse table, on layout A alone, under the PLAIN horizon
+average, on a model that no longer exists. Three things about it had never been checked:
+ - the weight is the same at every horizon, and should not be. At h=1 the residual is mostly the
+   cell's own state, which the neighbours do not know; at h=7 the predictable part is almost
+   entirely regional, which is exactly what the neighbours estimate. `horizon_w(h, w1, w7)` ramps
+   it linearly and the scan fits both ends.
+ - radius and iteration count were fixed at 1.
+ - the two columns either side of the dateline smoothed against half a neighbourhood, because
+   lon+1 at +179.5 does not exist. `wrap=True` closes the grid.
+One blending pass is LINEAR in the neighbour mean (res' = res + w*(nb - res)), so the whole
+(w1, w7) grid costs one neighbour pass per (radius, iters, wrap) rather than one pass each. That
+is what makes the scan cheap. Verified: `smooth_field` reproduces `smooth` bit for bit at scalar
+w for every (radius, iters) tested, so adopting it changes nothing until the scan says to.
+
+## 2. The magnitude of the predicted change was never calibrated  (postcal.py)
+Every model here predicts target - tws_known and the residual is added back unscaled. Under a
+regime shift -- and this is one, 2002-2015 training against a 2015-2018 test that starts in the
+GRACE/GRACE-FO gap -- a squared-error learner systematically mis-scales its predicted change on
+the next era. One scalar per horizon fixes that without touching the model:
+    p' = tws_known + a_h * (p - tws_known)
+a_h < 1 shrinks toward the last observation, a_h > 1 amplifies. Fitted by least squares through
+the origin on ~50k rows per horizon, then pulled halfway back to 1 and clipped to [0.80, 1.20],
+because the test era is a third regime and no layout is it. Fitted AFTER smoothing, since that is
+the order final_assemble applies them. Sanity-checked on a synthetic fixture whose predictions
+were deliberately over-scaled by 1/0.85: the fit recovers ~0.84 and the held-out gain is large;
+on the same data after smoothing removes the noise it correctly returns ~1.03 instead.
+
+## 3. h=1 is a different problem and had no specialist  (run_models.py HFILT, hsplice.py)
+h=1 is 33.3% of the test -- the largest single slice -- and is not the same problem as h=7. At
+h=1 the target is one month from an observed value and the answer is mostly the cell's own state
+plus a month of weather; at h=7 the observation is half a year stale and what survives is
+regional persistence and climatology. One ensemble has to spend its splits on both, and the
+compromise falls hardest on h=1. `HFILT=1` trains on the h=1 rows only (and early-stops on the
+h=1 slice of validation, not the pooled one -- otherwise the specialist is stopped by rows it
+will never see). `hsplice.py` scans the splice weight beta:
+    p'(h=1) = beta*specialist + (1-beta)*general,   p'(h>1) = general
+The specialist sees a third of the rows so it is noisier; beta is what lets it contribute without
+taking that noise on whole. Measured against the same lgb+xgb BLEND it will be spliced into, not
+against lgb alone, or beta would be fitted for a model that is never submitted.
+
+## 4. A third validation layout with the TEST's own geometry  (validation_c.py)
+A [3,2,3,7,3] and B [1,3,4,3,7,2] were both invented before the test's block structure was worked
+out. eval_mix repairs the horizon MARGINAL by reweighting, but not the joint structure: how stale
+tws_known is when a block starts, and how many months of covariates have accumulated since the
+last observation, are properties of the gaps, not of the horizon. Layout C takes the test's exact
+pattern [1,3,4,7,1,2] WITH the test's exact gaps and slides it back 40 months, so its last month
+is the last month of train:
+    test     2015-09 | 2016-01..03 | 2016-06..09 | 2016-12..2017-06 | 2018-07 | 2018-11..12
+    layout C 2012-05 | 2012-09..11 | 2013-02..05 | 2013-08..2014-02 | 2015-03 | 2015-07..08
+Calendar months differ by four, so C is not a seasonal replica -- nothing can be. What it
+replicates is the geometry, which is what A and B get wrong. C's history is shorter, so its
+absolute RMSE is not comparable with A's; only differences between methods are. It runs only the
+finalists (e1, e4, e8) plus the xgb and specialist runs: C exists to CONFIRM a choice made on A
+and B, not to make it, and a full grid there would cost as much as the grid itself.
+
+## Why the hindcast bias correction is NOT here
+NOTES session 9j listed "hindcast bias correction" as follow-up #1: at each block's t_known the
+truth is observed, so predict t_known from an earlier month, measure the error field, smooth it,
+carry it forward. Worked through, it does not survive contact with the test file. A row in this
+project's format at month t predicts TWS(t+1), so hindcasting a block's first month f needs a row
+at month f-1 -- and Test.csv contains ONLY the 18 block months. f-1 is never one of them, so the
+competition's own covariates (SPEI, soil moisture) do not exist for that row, and the hindcast
+would be made by a model looking at a feature vector unlike anything it was trained on. The
+measured "bias" would be that mismatch, not the regime. The gaps also make the hindcast horizons
+1, 4, 5, 6, 19 and 4 months, so the error field would be estimated at horizons far longer than
+the h=1..7 it would be applied to. Dropped, with the reasoning recorded so it is not re-proposed.
+
+## Orchestrator (run_night.sh)
+- Priority order changed so a usable submission exists as EARLY as possible: the moment config 1
+  finishes training, a file is written; every later phase only adds to it. `astep` never caches
+  an assemble, so each call picks up whatever seeds have landed since.
+- `BUDGET_H` (default 12, 24 with DEEP=1) with a `have_time` guard before every optional phase,
+  so a long run stops adding work rather than overrunning.
+- New phases: layout C (DEEP), the h=1 specialist on every layout, and 5b -- blend weight,
+  smoothing, splice weight and calibration, fitted in the order final_assemble applies them.
+- Three control files are now produced beside the main one: `sub_q_main_nosm` (no smoothing at
+  all) and `sub_q_main_nocal` (tuned smoothing, no calibration). If the leaderboard disagrees
+  with validation about the post-processing, those two say which stage caused it.

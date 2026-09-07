@@ -17,6 +17,7 @@ import sys
 import numpy as np
 import polars as pl
 from eval_mix import test_mix, load
+from xfit import layouts, loo_grid
 
 LGB = sys.argv[1] if len(sys.argv) > 1 else "lgb_v5x_noll"
 XGB = sys.argv[2] if len(sys.argv) > 2 else "xgb_v5x_noll"
@@ -34,39 +35,36 @@ def testmix(L, p, y, h):
 
 def main():
     scores = {}
-    for L in ("A", "B"):
+    for L in layouts():
         try:
             va = pl.read_parquet(f"out/mats/{L}_va.parquet", columns=["horizon", "target"])
             y = va["target"].to_numpy(); h = va["horizon"].to_numpy()
             a = load(L, [f"{LGB}:{TAG}"]); b = load(L, [f"{XGB}:{TAG}"])
-        except SystemExit as e:
+        except (SystemExit, FileNotFoundError) as e:
             print(f"  layout {L}: {e}", file=sys.stderr); continue
-        scores[L] = np.array([testmix(L, w * a + (1 - w) * b, y, h) for w in GRID])
+        scores[L] = {float(w): testmix(L, w * a + (1 - w) * b, y, h) for w in GRID}
     if not scores:
         print("FINAL_WLGB=0.5")
         print("  no predictions found -- keeping the 50/50 default", file=sys.stderr); return
 
     print("\n  w_lgb   " + "   ".join(f"{L}" for L in scores), file=sys.stderr)
-    for i, w in enumerate(GRID):
-        row = "   ".join(f"{scores[L][i]:.4f}" for L in scores)
-        star = "  <-" if all(scores[L][i] == scores[L].min() for L in scores) else ""
+    for w in GRID:
+        row = "   ".join(f"{scores[L][float(w)]:.4f}" for L in scores)
+        star = "  <-" if all(scores[L][float(w)] == min(scores[L].values()) for L in scores) else ""
         print(f"   {w:4.2f}   {row}{star}", file=sys.stderr)
 
-    mean = np.mean([scores[L] for L in scores], axis=0)
-    w = float(GRID[int(np.argmin(mean))])
-    wc = float(np.clip(w, 0.25, 0.75))
-    per = {L: float(GRID[int(np.argmin(scores[L]))]) for L in scores}
+    per = {L: min(scores[L], key=scores[L].get) for L in scores}
     print(f"\n  best per layout: {per}", file=sys.stderr)
-    print(f"  best on the mean: {w:.2f}" + (f" -> clipped to {wc:.2f}" if wc != w else ""),
-          file=sys.stderr)
-    if len(scores) == 2 and abs(per["A"] - per["B"]) > 0.3:
+    print("  leave-one-layout-out choice:", file=sys.stderr)
+    w, _, ok, lines = loo_grid(scores, 0.5, -0.0002)
+    for ln in lines:
+        print(ln, file=sys.stderr)
+    wc = float(np.clip(w, 0.25, 0.75))
+    if wc != w:
+        print(f"  clipped {w:.2f} -> {wc:.2f}: past that the blend is effectively one family",
+              file=sys.stderr)
+    if max(per.values()) - min(per.values()) > 0.3:
         print("  WARNING: the layouts disagree strongly; 0.5 is the safer choice", file=sys.stderr)
-        wc = 0.5
-    gain = float(np.mean([scores[L][int(np.argmin(mean))] - scores[L][GRID.tolist().index(0.5)]
-                          for L in scores]))
-    print(f"  gain over 50/50 (mean of layouts): {gain:+.5f}", file=sys.stderr)
-    if gain > -0.0002:
-        print("  gain is below what validation can resolve -- keeping 0.50", file=sys.stderr)
         wc = 0.5
     print(f"FINAL_WLGB={wc:.2f}")
 

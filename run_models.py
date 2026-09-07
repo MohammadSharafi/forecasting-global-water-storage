@@ -65,6 +65,17 @@ if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
 if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
 seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))
+# HFILT=1 or HFILT=2-7 trains a HORIZON SPECIALIST on that slice only (session 9m).
+# h=1 is 33% of the test and is a different problem from h=7: it is dominated by the cell's own
+# observed state and by one month of weather, where h=7 is almost entirely regional persistence
+# and climatology. One model trained on the pooled mixture has to compromise between them, and
+# the compromise is paid mostly at h=1 because the sampler draws it least often per unit of test
+# weight. hsplice.py measures whether splicing a specialist back in actually helps.
+HFILT=os.environ.get("HFILT","")
+HLO,HHI=(lambda a:(int(a[0]),int(a[-1])))(HFILT.split("-")) if HFILT else (0,99)
+if HFILT:
+    n0=len(tr); tr=tr.filter((pl.col("horizon")>=HLO)&(pl.col("horizon")<=HHI))
+    print(f"  HFILT={HFILT}: {len(tr)}/{n0} training rows kept",flush=True)
 if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
 X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
@@ -85,7 +96,10 @@ va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_k
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
 if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
 if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
-Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if L!="FINAL" else None; del va; gc.collect()
+Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if L!="FINAL" else None
+# a specialist must be early-stopped on ITS OWN slice; predictions are still made for every row
+hv=va["horizon"].to_numpy(); VM=(hv>=HLO)&(hv<=HHI) if HFILT else None
+del va; gc.collect()
 if AT!="tws": print(f"  anchor target: {AT}" + (f" rho={RHO}" if AT=="decay" else "") + f", base mean {kv.mean():+.4f}",flush=True)
 print(f"{L} {M} {FS}: X {X.shape} Xv {Xv.shape} ({time.time()-t0:.0f}s)",flush=True)
 seed=int(os.environ.get("SEED","0"))
@@ -103,7 +117,8 @@ if M in ("lgb","lgbd","lgbs","lgbm"):
     if M=="lgbs": P.update(num_leaves=31,min_data_in_leaf=2000,feature_fraction=0.4,lambda_l2=20.0)
     ds=lgb.Dataset(X,y,weight=w,free_raw_data=True,params={"max_bin":63}); ds.construct(); del X; gc.collect()
     if yv is not None and R is None:
-        m=lgb.train(P,ds,num_boost_round=6000,valid_sets=[lgb.Dataset(Xv,yv-kv,reference=ds)],callbacks=[lgb.early_stopping(200,verbose=False)])
+        ev=lgb.Dataset(Xv if VM is None else Xv[VM],(yv-kv) if VM is None else (yv-kv)[VM],reference=ds)
+        m=lgb.train(P,ds,num_boost_round=6000,valid_sets=[ev],callbacks=[lgb.early_stopping(200,verbose=False)])
         p=m.predict(Xv,num_iteration=m.best_iteration)+kv; report(p,f"best_iter={m.best_iteration}")
         g=dict(zip(F,m.feature_importance("gain"))); tot=sum(g.values()); print("   top gain:",[(f,round(100*g[f]/tot,1)) for f in sorted(F,key=lambda f:-g[f])[:15]])
     else:
@@ -113,7 +128,8 @@ elif M=="xgb":
     P=dict(objective="reg:squarederror",eta=0.03,max_depth=9,min_child_weight=200,subsample=0.8,colsample_bytree=0.6,reg_lambda=5.0,tree_method="hist",max_bin=63,nthread=8,seed=seed)
     d=xgb.DMatrix(X,y,weight=w,nthread=8); del X; gc.collect(); dv=xgb.DMatrix(Xv,(yv-kv) if yv is not None else None,nthread=8)
     if yv is not None and R is None:
-        m=xgb.train(P,d,6000,evals=[(dv,"va")],early_stopping_rounds=200,verbose_eval=False)
+        de=dv if VM is None else xgb.DMatrix(Xv[VM],(yv-kv)[VM],nthread=8)
+        m=xgb.train(P,d,6000,evals=[(de,"va")],early_stopping_rounds=200,verbose_eval=False)
         p=m.predict(dv,iteration_range=(0,m.best_iteration+1))+kv; report(p,f"best_iter={m.best_iteration}")
     else:
         m=xgb.train(P,d,R); p=m.predict(dv)+kv; report(p,f"rounds={R}"); m.save_model(f"out/mats/model_{L}_{M}_{FS}_s{seed}.json")

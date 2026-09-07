@@ -10,14 +10,16 @@ only if it wins on BOTH layouts.  Four decisions are made independently --
   hmix      e8 sampler default | e9 reweighted to the test horizon mix        (vs e8)
 
 Choosing them independently ignores interactions; it is a heuristic, and the table printed
-to stderr shows the evidence so a human can override.  Nothing is adopted by default: if a
-candidate does not win on both layouts, the incumbent stays.
+to stderr shows the evidence so a human can override.  Nothing is adopted by default: a candidate
+has to win on EVERY layout it was run on -- A, B, and C where it exists, C being the one whose
+block structure matches the real test -- and the incumbent stays otherwise.
 
 stdout: shell assignments for pipeline14.sh.   stderr: the table and the reasoning.
 """
 import sys
 import numpy as np
 from eval_mix import test_mix, load
+from xfit import layouts
 import polars as pl
 
 EXP = {
@@ -47,11 +49,21 @@ def testmix_rmse(L, e):
 
 
 def main():
+    LS = layouts()
     S = {}
     for k, e in EXP.items():
-        try:
-            S[k] = {L: testmix_rmse(L, e) for L in ("A", "B")}
-        except SystemExit:
+        # an experiment may have been run on fewer layouts than exist (layout C is built late and
+        # usually carries only the finalists), so keep whatever it does have and compare on the
+        # layouts the two experiments share.
+        d = {}
+        for L in LS:
+            try:
+                d[L] = testmix_rmse(L, e)
+            except SystemExit:
+                pass
+        if d:
+            S[k] = d
+        else:
             print(f"  {k} ({e['label']}): predictions missing, skipped", file=sys.stderr)
     if "e1" not in S or REF not in S:
         print("FINAL_DROPF=''\nFINAL_MODEL=lgb\nFINAL_WEIGHTS=ramp\nFINAL_HMIX=''")
@@ -59,23 +71,27 @@ def main():
               file=sys.stderr)
         return
 
-    print("\n  experiment                      testmix A   testmix B", file=sys.stderr)
+    print("\n  experiment                      " + "".join(f"testmix {L}   " for L in LS),
+          file=sys.stderr)
     for k in EXP:
         if k in S:
-            print(f"  {k} {EXP[k]['label']:28} {S[k]['A']:.4f}      {S[k]['B']:.4f}", file=sys.stderr)
+            print(f"  {k} {EXP[k]['label']:28} "
+                  + "     ".join(f"{S[k][L]:.4f}" if L in S[k] else "   -  " for L in LS),
+                  file=sys.stderr)
 
     def beats(cand, ref):
-        return S[cand]["A"] < S[ref]["A"] and S[cand]["B"] < S[ref]["B"]
+        shared = [L for L in LS if L in S[cand] and L in S[ref]]
+        return bool(shared) and all(S[cand][L] < S[ref][L] for L in shared)
 
     # features: best candidate that beats the pre-session-9 baseline on both layouts
     feat = "e1"
-    for k in sorted([c for c in FEATURE_CANDS if c in S], key=lambda c: S[c]["A"] + S[c]["B"]):
+    for k in sorted([c for c in FEATURE_CANDS if c in S], key=lambda c: sum(S[c].values()) / len(S[c])):
         if beats(k, "e1"):
             feat = k
             break
     # capacity / weights / horizon mix: switch only if the variant wins on both layouts
     model = EXP[REF]["model"]
-    for k in sorted([c for c in ("e5", "e6") if c in S], key=lambda c: S[c]["A"] + S[c]["B"]):
+    for k in sorted([c for c in ("e5", "e6") if c in S], key=lambda c: sum(S[c].values()) / len(S[c])):
         if beats(k, REF):
             model = EXP[k]["model"]
             break
@@ -87,7 +103,7 @@ def main():
     print(f"  capacity: {model}", file=sys.stderr)
     print(f"  weights : {weights}", file=sys.stderr)
     print(f"  hmix    : {hmix or 'sampler default'}", file=sys.stderr)
-    print("  (each decision requires a win on BOTH layouts; incumbent kept otherwise)",
+    print(f"  (each decision requires a win on ALL of {'+'.join(LS)}; incumbent kept otherwise)",
           file=sys.stderr)
     print(f"FINAL_DROPF='{dropf}'")
     print(f"FINAL_MODEL={model}")

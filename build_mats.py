@@ -39,7 +39,7 @@ if L=="FINAL":
             .filter(pl.col("t_obs")<=pl.col("time")).group_by(["lat","lon","time"]).agg(pl.col("t_obs").max().alias("t_known")))
     rows_va=te.select(["ID","lat","lon","time"]).join(known,on=["lat","lon","time"],how="left"); meta_va=["ID","lat","lon","time","t_known","horizon","tws_known"]
 else:
-    sfx={"A":"","B":"_B"}[L]; tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
+    sfx={"A":"","B":"_B","C":"_C"}[L]; tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
     cov_all=tr.select(["lat","lon","time"]+COV)
     obs_hist=hist.select(["lat","lon","time","TWS_t"]); obs_all=pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat","lon","time","TWS_t"])])
     rows_va=tp.select(["lat","lon","time","t_known","target"]); meta_va=["lat","lon","time","t_known","horizon","tws_known","target"]
