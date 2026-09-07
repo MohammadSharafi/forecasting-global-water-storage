@@ -241,3 +241,41 @@ more than blend tuning can explain, so the gap is structural.
   features on BOTH layouts with a printed ADOPT/DO-NOT-ADOPT verdict, then FINAL lgb+xgb at 5 seeds
   each (cat and mlp dropped per the family ladder) and two submission files (with and without the
   grid smooth). lgb rounds are taken from layout A's early stopping rather than the stale 560.
+
+# Session 9d — full R&D audit: two structural findings, one measurement fix
+Audited every feature module, the training-row sampler, both validation layouts and the block
+structure against the real test.
+
+1. VALIDATION MEASUREMENT BIAS (free to fix, affects every past decision).
+   Layout A blocks are [3,2,3,7,3] -> horizon mix h1 .278 h2 .278 h3 .222 h4 .056 h5-7 .056.
+   The real test blocks are [1,3,4,7,1,2] -> h1 .333 h2 .222 h3 .167 h4 .111 h5-7 .056.
+   Layout A therefore OVER-weights h2 and h3 by 5.6 points each and UNDER-weights h1 and h4 by the
+   same, while layout B ([1,3,4,3,7,2]) is much closer to the test. Since RMSE rises steeply with
+   horizon, every method that trades h1 accuracy for mid-horizon accuracy has been scored more
+   kindly on validation than the LB scores it -- a plausible contributor to the MLP / re-base /
+   climatology-pull transfer failures, all of which should hurt most at h1 (a third of the test).
+   The aggregate level barely moves (0.6312 vs 0.6294 for the same model); it is the differential
+   weighting that distorts the RANKING. eval_mix.py reports plain RMSE, testmix-reweighted RMSE and
+   a per-horizon breakdown for any saved prediction set, so past experiments can be re-scored free.
+2. NO SPATIAL SCALE ABOVE ~4 DEGREES ANYWHERE IN THE FEATURE SET.
+   The widest aggregation is add_wide4's radius-4 grid convolution (~440 km at the equator, less
+   toward the poles) plus the 800 km smoothed anchor. Session 3 measured that this period's
+   unpredictable component is regional and spatially coherent (+-0.3 global month-to-month offsets
+   in 2015) -- the largest identified error term -- and the model has no way to see it.
+   features_scale.py adds a zonal decomposition of the anchor field: band mean zm, the cell's
+   departure dz, band momentum zd3/zd12, and the cell's change with the band's removed dzd3/dzd12.
+   Deliberately NO global index: session 3's ONI result showed a single per-month global series is
+   heavily used and makes both layouts worse (few ENSO cycles, and it doubles as a month id).
+   A band-month value has 36 bands x ~160 months behind it and the deviations are cell-relative.
+   Verified on synthetic data: zm matches direct computation, zd12 recovers the true per-band drift.
+3. CAPACITY LADDER, untested downward. The LB ladder (lgb+xgb 0.70926 < +cat 0.71038 < +cat+mlp
+   0.71096 << mlp alone 0.72312) says capacity is what fails across the regime shift, yet nobody has
+   tried a SMALLER lgb. Added lgbm (63 leaves, min_data 1000, l2 10) and lgbs (31, 2000, l2 20).
+4. run_models.py gained DROPF=anom,scale to ablate a feature group without a new featset name.
+   NOT called DROP -- that env var is already the MLP dropout rate, and the collision would have
+   crashed every MLP run.
+- Training-row horizon mix is h1 34% then uniform 11% on h2..h7, against the test's 22/17/11/5.6/
+  5.6/5.6. weight_val.py tested test-mix training weights in the v4 era and found it within noise;
+  worth revisiting only if the horizon breakdown shows a systematic long-horizon deficit.
+- pipeline13.sh runs the 7-experiment grid on both layouts and reports under the test mix;
+  pipeline14.sh builds the submission from the chosen configuration.

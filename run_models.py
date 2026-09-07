@@ -21,6 +21,7 @@ F6=[f for f in FEATS2+AR+WIDE+RECENT if f not in LONGTERM]
 NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
 NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
 ANOMF=[f for f in ALL if f.startswith("an_")]   # per-cell standardised covariate anomalies (features_anom)
+from features_scale import SCALE
 from features_x import WIDE4, COVWIN, RESP
 SA=["sa300","dsa300","sa500","dsa500","sa800","dsa800","sa_grad"]
 SA3=["lb300","la300","ln300","lp300","lpd300","lb500","la500","ln500","lp500","lpd500"]
@@ -37,6 +38,12 @@ SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+W
       "v5x_noll_noanom":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("an_")],
       "allnoll_noanom":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("an_")]}
 F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])
+# DROPF=anom,scale removes a feature group without needing a new featset name -- this is how the
+# session-9d experiments are ablated against the same baseline. (Not DROP: that is the MLP dropout.)
+DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
+if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
+if "scale" in DROPF: F=[f for f in F if f not in SCALE]
+if DROPF: print(f"  dropped {sorted(DROPF)}: {len(F)} features remain",flush=True)
 AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
 def base_of(df):
     """What the residual target is measured against (and what the prediction is added back to)."""
@@ -69,10 +76,14 @@ def report(p,tag=""):
     if yv is None: return
     h=None
     print(f"  {tag} RMSE={np.sqrt(np.mean((yv-p)**2)):.4f} bias={np.mean(p-yv):+.4f} ({time.time()-t0:.0f}s)",flush=True)
-if M in ("lgb","lgbd"):
+if M in ("lgb","lgbd","lgbs","lgbm"):
     import lightgbm as lgb
     P=dict(objective="regression",learning_rate=0.02,num_leaves=127,min_data_in_leaf=500,feature_fraction=0.6,bagging_fraction=0.8,bagging_freq=1,lambda_l2=5.0,verbose=-1,num_threads=8,max_bin=63,seed=seed)
     if M=="lgbd": P.update(num_leaves=255,min_data_in_leaf=300,learning_rate=0.01,feature_fraction=0.5)
+    # The leaderboard family ladder (lgb+xgb < +cat < +cat+mlp << mlp alone) says capacity is
+    # what fails across the 2015-18 regime shift. These two step DOWN from the default 127.
+    if M=="lgbm": P.update(num_leaves=63,min_data_in_leaf=1000,feature_fraction=0.5,lambda_l2=10.0)
+    if M=="lgbs": P.update(num_leaves=31,min_data_in_leaf=2000,feature_fraction=0.4,lambda_l2=20.0)
     ds=lgb.Dataset(X,y,weight=w,free_raw_data=True,params={"max_bin":63}); ds.construct(); del X; gc.collect()
     if yv is not None and R is None:
         m=lgb.train(P,ds,num_boost_round=6000,valid_sets=[lgb.Dataset(Xv,yv-kv,reference=ds)],callbacks=[lgb.early_stopping(200,verbose=False)])

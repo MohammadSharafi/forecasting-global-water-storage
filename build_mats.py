@@ -11,6 +11,7 @@ import glob
 from features_era5 import load_era5, add_era5, ERA5F
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
 from features_anom import build as anom_build, add_anom, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
+from features_scale import add_scale, SCALE
 L=sys.argv[1]; os.makedirs("out/mats",exist_ok=True); t0=time.time()
 tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
 lats=tr["lat"].unique().to_list(); lons=tr["lon"].unique().to_list()
@@ -18,6 +19,7 @@ nc,cols=load_ncep(lats,lons); nc2,cols2=load_ncep2(lats,lons); cpc,cols3=load_cp
 ERA=load_era5() if glob.glob("external/era5/*.nc") else None; print("era5:", None if ERA is None else ERA.shape, flush=True); print("ext loaded",cols,cols2,cols3,f"({time.time()-t0:.0f}s)",flush=True)
 def feats(rows,cov_all,obs,sums,cell,resp,loyo):
     r=add_recent(add_wide(add_ar(assemble2(rows,cov_all,obs,sums,cell,loyo=loyo),obs)),obs)
+    r=add_scale(r,obs)   # zonal context: the widest aggregation elsewhere is only radius 4
     r,NF=add_ncep(r,nc,cols); r,NF2=add_ext(r,nc2,cols2,acc_cols=["r2P","r2E","r2PER"]); r,NF3=add_ext(r,cpc,cols3)
     r=add_wide4(r); r=add_covwin(r,cov_all); r=add_response(r,resp)
     EF=[]
@@ -25,7 +27,7 @@ def feats(rows,cov_all,obs,sums,cell,resp,loyo):
     AF=[]   # per-cell standardised covariate anomalies (features_anom): the level features above
     for at,sz,fz in ANOM:   # are raw mm and unusable without lat/lon, which is not a feature
         r,f=add_anom(r,at,sz,fz); AF+=f
-    F=FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF
+    F=FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF+SCALE
     F=list(dict.fromkeys(F)); return r,F
 if L=="FINAL":
     te=pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
