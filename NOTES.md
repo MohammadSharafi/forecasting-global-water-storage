@@ -417,3 +417,26 @@ Around us: 73 fishnchips 0.70505 | 74 AbolfazlB 0.70514 | 75 Verlon 0.70605 | 76
   nothing already computed changes.
 - MEMORY WARNING: the matrix is heading for ~260 features. On FINAL (3.47M rows) that is roughly
   3.6 GB for the training frame before LightGBM's binned copy. Keep PER_ROW=2; drop to 1 on OOM.
+
+# Session 9i — E2 WAS AN ARTIFACT. The covariate avenue was closed on a broken measurement.
+Session 5's E2 reported corr = -0.02 and R^2 ~ 0.006 between the one-month TWS change and the
+ERA5 water balance, and concluded "next month's weather does not explain the change -> seasonal
+forecasts cannot help". That closed covariate work for four sessions.
+The number is physically impossible: P - E - R IS the change in stored water, so the correlation
+must be strongly positive. ceiling.py reproduces the failure on synthetic data where the answer
+is known -- dy driven perfectly by the water-balance ANOMALY (true r = 0.844), with a realistic
+Amazon-vs-Sahara spread of raw scale between cells:
+    raw  e5PER_acc      global r = 0.038   <- reproduces E2's ~zero
+    anom an_e5PERz_acc  global r = 0.845   <- recovers the truth
+A perfect relationship reads as zero when measured on RAW totals pooled across cells, because the
+seasonal cycle and the between-cell scale spread dominate. This is the same encoding bug as 9c,
+and it explains why the anomaly features then produced the largest validation gain in the
+project's history (-0.0122 / -0.0173).
+CONSEQUENCE: session 5's conclusion that "the unpredictable component is weather-independent and
+no legal input predicts it" rests on a broken measurement and should not be treated as settled.
+More covariate information (ERA5-Land, more variables, longer windows) is worth more investment
+than sessions 5-8 assumed.
+ceiling.py measures the real ceiling on the actual data three ways -- pooled, within-cell
+(demeaned per cell, which removes scale entirely) and per horizon -- plus a ridge on the whole
+an_ block fitted on tr and scored on va as an honest LINEAR bound the trees should exceed.
+Run it after the current rebuild: python ceiling.py A ; python ceiling.py B
