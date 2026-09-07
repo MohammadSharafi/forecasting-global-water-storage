@@ -16,7 +16,11 @@ def anchor_fields(anchor_months, obs, radii_km=(300,500,800)):
     for km in radii_km:
         S=np.zeros_like(A0); C=np.zeros_like(A0)
         for i in range(180):
-            dlat=max(1,int(round(km/111.0))); dlon=max(1,int(round(km/(111.0*max(np.cos(np.radians(lat_c[i])),0.1)))))
+            dlat=max(1,int(round(km/111.0)))
+            # cos is floored at 0.1, so near the poles a large radius asks for a longitude
+            # window wider than the globe (2500 km wants 451 of 360 cells). Cap at 179 so the
+            # window is at most the full circle; below ~1600 km this cap never binds.
+            dlon=min(179,max(1,int(round(km/(111.0*max(np.cos(np.radians(lat_c[i])),0.1))))))
             i0,i1=max(0,i-dlat),min(180,i+dlat+1); n=i1-i0; w=2*dlon+1
             sb=uniform_filter(A0[:,i0:i1,:],size=(1,n,w),mode=("constant","constant","wrap"))*n*w
             cb=uniform_filter(Mf[:,i0:i1,:],size=(1,n,w),mode=("constant","constant","wrap"))*n*w

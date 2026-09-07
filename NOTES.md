@@ -330,3 +330,29 @@ comparison is paired and clean.
   precipitation but strong in water stores, and warns that short-lag autocorrelation is a poor
   predictability indicator under strong interannual variability -- already covered by lag12,
   tws_ly, mean24 and rmean60.
+
+# Session 9e — second R&D batch (built while the 9d run was in flight; NOT in that run)
+1. MODELLED TOTAL WATER STORAGE (features_anom.add_mtws). See the 9d literature note: LSM-simulated
+   TWSA is the top-ranked predictor in the reconstruction literature, and every component was
+   present while the SUM never was. e5MTWS = e5SW*1000 + e5SWE, MTWS = SW + SWE.
+2. CONTINENTAL ANCHORS at 1500 and 2500 km (add_anchor_feats, ANCHOR_RADII env; plus sa_grad2 =
+   sa800 - sa2500). Nothing aggregated above 800 km, and session 3 says the dominant error is
+   regional and coherent. A great-circle disc is also more hydrologically coherent than the zonal
+   band added in 9d: the 45N ring mixes Oregon, Iowa, France, Kazakhstan and Mongolia. Both are in
+   the grid so the data decides.
+   BUG FIXED IN anchor.py: cos(lat) is floored at 0.1, so at 2500 km the polar longitude window
+   asked for 451 of 360 cells. dlon is now capped at 179. Verified: a latitude-only field is
+   recovered at every radius and white-noise sd falls monotonically 0.062 -> 0.012 with radius.
+3. TRAINING HORIZON MIX (HMIX=test). The sampler draws h1 at 34% then h2..h7 uniformly at ~11%,
+   against the test's 22/17/11/5.6/5.6/5.6 -- h5-h7 oversampled 2x, h2-h3 undersampled 2x.
+   HMIX=test reweights to the test mix exactly (verified: effective shares match to 0.003).
+   weight_val.py tested this in the v4 era and called it noise, but that was 30 features, layout A
+   only, and scored with the PLAIN RMSE that itself over-weights h2/h3.
+4. ROBUSTNESS: run_models now reads the anchor feature names from the parquet schema instead of a
+   hardcoded list, so adding a radius needs no second edit. DROPF gained "bigsa". pipeline14 checks
+   the FINAL matrix carries every feature in feats.json before training, so a stale matrix fails in
+   one second instead of deep into a seed.
+5. The grid is now 9 experiments (e1 base, e2 anomalies, e3 zonal, e4 both, e8 +big anchors,
+   e5/e6 capacity, e7 uniform weights, e9 test horizon mix) and select_config makes four
+   independent decisions, each requiring a win on BOTH layouts. Verified on a synthetic fixture
+   with all four planted: it recovers each one and refuses the deliberately-worse uniform variant.

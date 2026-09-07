@@ -15,10 +15,10 @@ cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
 M=out/mats; mkdir -p "$M"
 log() { printf '\n=== %s  (%s) ===\n' "$1" "$(date +%H:%M:%S)"; }
 
-FM=${FINAL_MODEL:-lgb}; FD=${FINAL_DROPF:-}; FW=${FINAL_WEIGHTS:-ramp}
+FM=${FINAL_MODEL:-lgb}; FD=${FINAL_DROPF:-}; FW=${FINAL_WEIGHTS:-ramp}; FH=${FINAL_HMIX:-}
 NS=${SEEDS:-5}; USE_XGB=${XGB:-1}
 TAG="_f"
-echo "configuration: model=$FM dropf='$FD' weights=$FW seeds=$NS xgb=$USE_XGB"
+echo "configuration: model=$FM dropf='$FD' weights=$FW hmix='$FH' seeds=$NS xgb=$USE_XGB"
 
 B=out/backup_pre_anom; mkdir -p "$B"
 cp out/*.csv "$B"/ 2>/dev/null
@@ -31,15 +31,31 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   tail -1 "$M/build_FINAL.log"
 fi
 
+# build_mats writes feats.json for whichever layout ran last. If FINAL was not rebuilt in this
+# run (SKIP_BUILD=1) its matrix can predate that list, and run_models would fail deep into
+# training on a missing column. Check it here, in one second, instead.
+$PY - <<'PYCHK' || exit 1
+import json, sys, polars as pl
+want=set(json.load(open("out/mats/feats.json")))
+have=set(pl.scan_parquet("out/mats/FINAL_va.parquet").collect_schema().names())
+have|=set(pl.scan_parquet("out/mats/FINAL_va_anchor.parquet").collect_schema().names())
+miss=sorted(want-have)
+if miss:
+    print(f"FINAL matrix is missing {len(miss)} features that feats.json expects, e.g. {miss[:6]}")
+    print("Rerun without SKIP_BUILD=1 so the FINAL matrix matches the experiments.")
+    sys.exit(1)
+print(f"FINAL matrix carries all {len(want)} features")
+PYCHK
+
 # rounds from the matching layout-A experiment if it is on disk, else the historical default
-R=$(grep -o 'best_iter=[0-9]*' "$M"/x_A_e4.log 2>/dev/null | tail -1 | cut -d= -f2)
+R=$(grep -o 'best_iter=[0-9]*' "$M"/x_A_e8.log 2>/dev/null | tail -1 | cut -d= -f2)
 LR=${LGB_ROUNDS:-${R:-560}}; XR=${XGB_ROUNDS:-400}
 echo "rounds: $FM=$LR xgb=$XR"
 
 s=0
 while [ "$s" -lt "$NS" ]; do
   log "FINAL $FM seed $s"
-  SEED=$s DROPF="$FD" WEIGHTS="$FW" TAG="$TAG" \
+  SEED=$s DROPF="$FD" WEIGHTS="$FW" HMIX="$FH" TAG="$TAG" \
     $PY run_models.py FINAL "$FM" v5x_noll_sa "$LR" > "$M/F_${FM}_s$s.log" 2>&1 \
     || { tail -20 "$M/F_${FM}_s$s.log"; exit 1; }
   s=$((s+1))
@@ -48,7 +64,7 @@ if [ "$USE_XGB" = "1" ]; then
   s=0
   while [ "$s" -lt "$NS" ]; do
     log "FINAL xgb seed $s"
-    SEED=$s DROPF="$FD" WEIGHTS="$FW" TAG="$TAG" \
+    SEED=$s DROPF="$FD" WEIGHTS="$FW" HMIX="$FH" TAG="$TAG" \
       $PY run_models.py FINAL xgb v5x_noll_sa "$XR" > "$M/F_xgb_s$s.log" 2>&1 \
       || { tail -20 "$M/F_xgb_s$s.log"; exit 1; }
     s=$((s+1))

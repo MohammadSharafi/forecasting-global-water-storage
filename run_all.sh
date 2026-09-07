@@ -49,7 +49,7 @@ cat out/config.sh
 # --------------------------------------------------------------- 4. final submission
 log "FINAL (pipeline14)"
 FINAL_DROPF="$FINAL_DROPF" FINAL_MODEL="$FINAL_MODEL" FINAL_WEIGHTS="$FINAL_WEIGHTS" \
-  ./pipeline14.sh 2>&1 | tee out/pipeline14.log
+  FINAL_HMIX="$FINAL_HMIX" ./pipeline14.sh 2>&1 | tee out/pipeline14.log
 
 log "SUMMARY"
 echo "chosen configuration:"; sed 's/^/  /' out/config.sh

@@ -23,11 +23,16 @@ NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswit
 ANOMF=[f for f in ALL if f.startswith("an_")]   # per-cell standardised covariate anomalies (features_anom)
 from features_scale import SCALE
 from features_x import WIDE4, COVWIN, RESP
-SA=["sa300","dsa300","sa500","dsa500","sa800","dsa800","sa_grad"]
-SA3=["lb300","la300","ln300","lp300","lpd300","lb500","la500","ln500","lp500","lpd500"]
+def _acols(path):
+    """Anchor feature names come from the parquet itself, so adding a radius in
+    add_anchor_feats.py needs no matching edit here."""
+    return pl.scan_parquet(path).collect_schema().names() if os.path.exists(path) else []
+SA=_acols(f"out/mats/{L}_tr_anchor.parquet")
+BIGSA=[c for c in SA if any(c.endswith(str(r)) for r in (1500,2500)) or c=="sa_grad2"]
+SA3=_acols(f"out/mats/{L}_tr_anchor3.parquet")
 USE_SA3=FS.endswith("_sa3") and os.path.exists(f"out/mats/{L}_tr_anchor3.parquet")
 if USE_SA3: FS=FS[:-4]
-SA2=["sb300","sb300_d1","sb300_d2","sb300_d3","sb300_d12","sb300_trend","sb300_persist","sb600","sb600_d1","sb600_d2","sb600_d3","sb600_d12","sb600_trend","sb600_persist","sb_scale"]
+SA2=_acols(f"out/mats/{L}_tr_anchor2.parquet")
 USE_SA2=FS.endswith("_sa2") and os.path.exists(f"out/mats/{L}_tr_anchor2.parquet")
 if USE_SA2: FS=FS[:-4]
 USE_SA=os.path.exists(f"out/mats/{L}_tr_anchor.parquet") and (FS.endswith("_sa") or USE_SA2 or USE_SA3)
@@ -43,6 +48,7 @@ F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else 
 DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
+if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
 if DROPF: print(f"  dropped {sorted(DROPF)}: {len(F)} features remain",flush=True)
 AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
 def base_of(df):
@@ -63,6 +69,17 @@ if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
 X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
 if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)   # no recent-year emphasis (test regime differs from the last training years)
+if os.environ.get("HMIX","")=="test":
+    # reweight training rows to the real test horizon mix (blocks 1,3,4,7,1,2). The sampler
+    # draws h1 at 34% then h2..h7 uniformly at 11% each, so h5-h7 are oversampled about 2x and
+    # h2-h3 undersampled about 2x relative to the test.
+    MIX={1:.3333,2:.2222,3:.1667,4:.1111,5:.0556,6:.0556,7:.0556}
+    hh=tr["horizon"].to_numpy()
+    freq={k:float((hh==k).mean()) for k in range(1,8)}
+    hw=np.array([MIX.get(int(x),0.0)/max(freq.get(int(x),1e-9),1e-9) for x in hh],dtype=np.float32)
+    hw/=hw.mean(); w=(w*hw).astype(np.float32)
+    print(f"  HMIX=test: train horizon freq {[round(freq[k],3) for k in range(1,8)]}"
+          f" -> weight range {hw.min():.2f}..{hw.max():.2f}",flush=True)
 del tr; gc.collect()
 va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
