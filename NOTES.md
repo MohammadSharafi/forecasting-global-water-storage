@@ -440,3 +440,30 @@ ceiling.py measures the real ceiling on the actual data three ways -- pooled, wi
 (demeaned per cell, which removes scale entirely) and per horizon -- plus a ridge on the whole
 an_ block fitted on tr and scored on va as an honest LINEAR bound the trees should exceed.
 Run it after the current rebuild: python ceiling.py A ; python ceiling.py B
+
+# Session 9j — the largest measured error component has never been targeted: the GLOBAL SHIFT
+Session 3 measured "month-to-month global offsets of +-0.3" and concluded the unpredictable part
+is regional and spatially coherent. That is the biggest error component ever identified here, and
+NOTHING has ever targeted it. Every model predicts cells independently; whatever global shift the
+predictions contain is an accident of averaging, never a modelled quantity.
+Arithmetic: total MSE ~0.503 (RMSE 0.709). A per-month global offset with sd 0.3 is 0.09 of that,
+about 18% of the whole error. Capturing a third of it is worth ~0.014 RMSE -- the whole gap to
+the 0.69 target.
+globalshift.py measures it: per target month the true vs predicted mean change, the regression
+slope (does the model SHRINK the shift?), the share of MSE that is pure global offset, an ORACLE
+bound for perfect correction, the same per 30-degree band, and -- crucially -- whether the offset
+is temporally correlated, since a correction is only usable if it can be predicted from
+information at <= t.
+Verified on synthetic data with a planted shift the model cannot see: it reports the captured
+ratio as 0.02, the MSE share as 68%, the oracle as 0.3188 -> 0.1796, AND correctly refuses the
+persistence correction because the planted offset was temporally white. That last behaviour is
+the point -- the script is built to say "closed" as readily as "open".
+Two follow-ups, to build ONLY if the oracle is large AND the persistence correlation is non-zero:
+ 1. hindcast bias correction. At each block's t_known T the truth is observed, and so is some
+    earlier month T'. Predict T from T', compare to truth, smooth the error field spatially, and
+    carry it forward. Uses only observations <= t_known, so it is compliant. This is the legal
+    way to estimate the CURRENT regime's regional bias.
+ 2. a dedicated small model for the global/zonal index itself, predicted from its own history and
+    global covariate anomalies. Higher overfit risk (one series, ~160 months) -- the same trap
+    that sank ONI -- so only worth it if the oracle is large.
+Run after the rebuild: python globalshift.py A lgb_v5x_noll ; python globalshift.py B lgb_v5x_noll
