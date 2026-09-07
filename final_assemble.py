@@ -19,6 +19,7 @@ env
   SMOOTH_W     legacy single smoothing weight (default 0.7); SMOOTH_W=0 turns smoothing off
   SMOOTH_W1 SMOOTH_W7 SMOOTH_R SMOOTH_IT SMOOTH_WRAP   the tuned smoothing
   CALIB        'a1,..,a7' per-horizon scale of the predicted change
+  CALIB_B      'b1,..,b7' per-horizon offset, when postcal adopted the affine form
   H1SPEC H1TAG H1BETA   the horizon-1 specialist stem, its file suffix, and its blend weight
 """
 import polars as pl, numpy as np, sys, glob, re, os
@@ -69,11 +70,15 @@ print(f"smoothing w1={w1} w7={w7} radius={R} iters={IT} wrap={WRAP}")
 
 # --- per-horizon calibration of the predicted change (postcal.py)
 CAL = os.environ.get("CALIB", "").strip()
+CALB = os.environ.get("CALIB_B", "").strip()
 if CAL:
     a = np.array([1.0] + [float(x) for x in CAL.split(",")])
-    assert len(a) == 8, "CALIB needs seven values, one per horizon"
-    p = k + a[np.clip(h, 1, 7)] * (p - k)
-    print("calibration " + " ".join(f"h{i}={a[i]:.3f}" for i in range(1, 8)))
+    b = np.array([0.0] + [float(x) for x in CALB.split(",")]) if CALB else np.zeros(8)
+    assert len(a) == 8 and len(b) == 8, "CALIB/CALIB_B need seven values, one per horizon"
+    j = np.clip(h, 1, 7)
+    p = k + a[j] * (p - k) + b[j]
+    print("calibration " + " ".join(f"h{i}={a[i]:.3f}" + (f"{b[i]:+.3f}" if CALB else "")
+                                    for i in range(1, 8)))
 
 N = int(os.environ.get("NROWS", "280961"))   # the real test has exactly this many rows
 assert np.isfinite(p).all() and len(p) == N, f"{len(p)} rows, expected {N}, or non-finite values"

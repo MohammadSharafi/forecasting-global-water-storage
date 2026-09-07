@@ -1,10 +1,14 @@
 #!/bin/sh
 # Session 9 overnight orchestrator: every queued idea, measured, prioritised, assembled, audited.
 #
-#   ./run_night.sh                      # ~4 h   the decisions and one submission
-#   WIDE=1 ./run_night.sh               # ~7 h   + CatBoost and the other capacities, stacked
-#   DEEP=1 ./run_night.sh               # ~11 h  + layout C, 16 seeds, a third config
+#   ./run_night.sh                      # ~3.5 h  the decisions and one submission
+#   WIDE=1 ./run_night.sh               # ~5 h    + CatBoost and the other capacities, stacked
+#   DEEP=1 ./run_night.sh               # ~7.5 h  + layout C, 16 seeds, a third config
 #   BUDGET_H=20 DEEP=1 ./run_night.sh   # the same, but optional phases stop after 20 hours
+#
+# Those are measured, not guessed: from the 2026-09-07 run on this machine, one grid experiment
+# takes 100-215 s, build_mats is 8 min for layout A and 11 for FINAL, and a FINAL seed is 1.6 min
+# for lgb and 3.2 for xgb.
 #   FORCE=1 ./run_night.sh              # ignore checkpoints and redo everything
 #
 # FULLY RESUMABLE. Every step writes a marker in out/night/ when it succeeds, and a rerun skips
@@ -203,8 +207,9 @@ HB=${FINAL_H1BETA:-0}
 # calibration is fitted on the SMOOTHED prediction, because that is the order it is applied in
 step postcalscan "$PY postcal.py '$BLEND' > out/calib.sh" || true
 if [ -s out/calib.sh ]; then cat "$S/postcalscan.log" >> "$R"; . ./out/calib.sh; fi
-CB=${FINAL_CALIB-}
-say "post-processing: smoothing w1=$SW1 w7=$SW7 r=$SR it=$SI wrap=$SP | h1 beta=$HB | calib='${CB:-none}'"
+CB=${FINAL_CALIB-}; CBB=${FINAL_CALIB_B-}
+say "post-processing: smoothing w1=$SW1 w7=$SW7 r=$SR it=$SI wrap=$SP | h1 beta=$HB"
+say "  calibration scale='${CB:-none}' offset='${CBB:-none}'"
 
 head1 "PHASE 5c  where the remaining error is"
 for X in $LAYOUTS; do
@@ -252,6 +257,7 @@ asm() {  # asm <name> <tag> <members> <smoothing override, empty = the tuned one
   env="TAG=$2"
   if [ -n "$4" ]; then env="$env SMOOTH_W=$4 SMOOTH_W1=$4 SMOOTH_W7=$4 SMOOTH_R=1 SMOOTH_IT=1 SMOOTH_WRAP=0"; fi
   [ -n "$CB" ] && env="$env CALIB=$CB"
+  [ -n "$CBB" ] && env="$env CALIB_B=$CBB"
   if [ "$HB" != "0" ] && [ "$HB" != "0.00" ] && done_ "FH1_${FM}_s0"; then
     env="$env H1SPEC=${FM}_v5x_noll H1TAG=_h1 H1BETA=$HB"
   fi
@@ -295,7 +301,8 @@ head1 "PHASE 9  submissions, audit, report"
 if done_ "F_f1_${FM}_s0"; then
   asm sub_q_main      _f1 "$MEMBERS" ""     # the tuned post-processing
   asm sub_q_main_nosm _f1 "$MEMBERS" 0      # no smoothing at all, as a control
-  CBK=$CB; CB=""; asm sub_q_main_nocal _f1 "$MEMBERS" ""; CB=$CBK   # no calibration, as a control
+  CBK=$CB; CBBK=$CBB; CB=""; CBB=""                      # no calibration at all, as a control
+  asm sub_q_main_nocal _f1 "$MEMBERS" ""; CB=$CBK; CBB=$CBBK
 fi
 ALT=lgbs; [ "$FM" = lgbs ] && ALT=lgb
 done_ "F_f2_${ALT}_s0" && asm sub_q_alt _f2 "${ALT}_v5x_noll:$WL xgb_v5x_noll:$WX" ""

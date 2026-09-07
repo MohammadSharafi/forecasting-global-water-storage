@@ -665,3 +665,71 @@ THAT family on the chosen configuration, instead of reusing lgb's count for ever
 requirements.txt lists lightgbm, polars and friends but not xgboost, catboost or scipy, all of
 which the run path imports. Deliberately not touched mid-competition -- a reinstall now is a risk
 not worth taking -- but run `pip freeze` and reconcile it before the code review.
+
+# Session 9d results — the first full grid, run 2026-09-07 12:05-13:22
+
+Run on the entrant's machine at commit 05b940b, so WITHOUT the 1500/2500 km anchors, the
+antecedent windows, the modelled-TWS composite or any of the session-9m post-processing. Scored
+under the real test horizon mix on both layouts.
+
+  experiment                 testmix A   testmix B    vs e4 (A / B)
+  e1 base, no anom no zonal     0.6551      0.5584    +0.0132  +0.0201
+  e2 +covariate anomalies       0.6422      0.5399    +0.0003  +0.0016
+  e3 +zonal scale only          0.6551      0.5574    +0.0132  +0.0191
+  e4 +both                      0.6419      0.5383         --       --
+  e5 both, 63 leaves            0.6432      0.5375    +0.0013  -0.0008
+  e6 both, 31 leaves            0.6451      0.5387    +0.0032  +0.0004
+  e7 both, uniform weights      0.6432      0.5424    +0.0013  +0.0041
+
+Chosen: DROPF='' (e4), lgb, ramp weights. Five seeds each of lgb and xgb -> out/sub_p_final.csv.
+
+## What it settles
+1. THE COVARIATE ANOMALIES ARE REAL AND LARGE. -0.0128 on A, -0.0184 on B, and they win at every
+   horizon on B and at six of seven on A. This is now confirmed twice on independent runs, and it
+   is an order of magnitude above the 0.00096 leaderboard-noise threshold for this pair of files,
+   so if it does not show up on the public board the failure is in TRANSFER, not in the feature.
+2. THE ZONAL FEATURES ARE NEARLY WORTHLESS ALONE: +0.0001 on A, -0.0010 on B. On top of the
+   anomalies they are worth -0.0003 (A) and -0.0016 (B) -- inside noise on A. Kept because they
+   do not hurt, but they are not where the next gain is. The ONI trap warning in features_scale.py
+   was the right instinct; the band-relative encoding avoided the disaster but did not find much.
+3. CAPACITY IS GENUINELY AMBIGUOUS. 63 leaves is the best model on layout B (-0.0008 vs e4) and
+   the third best on A (+0.0013). The both-layouts rule keeps 127 leaves, correctly, but this is
+   the closest call in the grid and it is exactly why layout C was built.
+4. UNIFORM WEIGHTS ARE THE BEST THING AT h=1 ON LAYOUT A (-0.0224 against the base, better than
+   any other variant) and lose everywhere else. h1 is a third of the test, so this is worth
+   re-checking once layout C exists.
+
+## The finding that changed the code: a large, systematic OVER-prediction
+Every one of the seven experiments reports a positive bias -- mean prediction minus truth:
+
+  e1  A +0.0136   B +0.0625        e4  A +0.0110   B +0.0555
+  e2  A +0.0167   B +0.0601        e7  A +0.0029   B +0.0517
+
+Layout B's +0.055 is not small: it is about 1% of the RMSE in the mean alone, and no feature or
+capacity change moves it much (uniform weights shave it from 0.0625 to 0.0517 and nothing else
+touches it). postcal.py fitted only a SCALE through the origin, which cannot remove an offset at
+all, so this error was structurally invisible to every correction in the pipeline.
+
+postcal now fits both forms and lets the held-out layout choose:
+
+  scale    p' = k + a_h * (p - k)
+  affine   p' = k + a_h * (p - k) + b_h
+
+The offset is not obviously transferable -- it is five times larger on B than on A, so it is a
+property of the era rather than of the model -- which is precisely why the decision is made by a
+leave-one-layout-out score rather than by judgement. Verified on fixtures in three regimes:
+identical bias on both layouts (affine adopted, offset = half the bias, as LAM=0.5 intends), the
+real same-sign divergence +0.011 / +0.055 (affine still adopted, offset shrunk to about a third of
+B's), and opposite signs +0.05 / -0.05 (affine REJECTED, scale kept, FINAL_CALIB_B empty).
+
+## Measured timings, so the orchestrator's estimates stop being guesses
+build_mats 8 min (A), 4.5 (B), 11.5 (FINAL); one grid experiment 100-215 s; a FINAL seed 1.6 min
+for lgb and 3.2 for xgb; the whole old run_all.sh 77 minutes. run_night.sh is therefore about
+3.5 h by default, 5 h with WIDE=1, 7.5 h with DEEP=1 -- not the 4/11 h previously written.
+
+## Next action for the entrant
+Submit out/sub_p_final.csv. It is the first file that contains the anomaly features, its
+validation gain is 10-20x the noise threshold for this pair, and whether that gain appears on the
+public board decides everything else: if it transfers, the same features under the session-9m
+pipeline should go further; if it does not, the problem is the 2015-18 regime and the effort
+belongs in calibration and the ensemble rather than in more features.
