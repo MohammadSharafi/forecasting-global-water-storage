@@ -1,5 +1,43 @@
 # Session 9 — where the remaining score actually is
 
+> ## 0. Update, 7 Sep — five leaderboard results, and two of my recommendations are dead
+>
+> | file | public LB | vs previous best (0.71096) |
+> |---|---|---|
+> | `sub_i_lt_lgbxgb` (lgb .5 xgb .5) | **0.709259** | **−0.0017, new best** |
+> | `sub_i_lt_trees` (lgb .4 xgb .4 cat .2) | 0.710382 | −0.0006 |
+> | `sub_g_longterm` (lgb .3 xgb .3 cat .15 mlp .25) | 0.710959 | — |
+> | `sub_h_l10_rb3_500` (500 km re-base, a=0.3) | 0.717866 | **+0.0069** |
+> | `sub_i_lt_mlp` (MLP alone) | 0.723121 | **+0.0121** |
+> | `sub_h_l10_clim1` (climatology pull) | 0.731800 | **+0.0208** |
+>
+> **The model-family ladder is monotone and it runs the opposite way to validation.** Every
+> step that removes capacity from the blend improves the test score: lgb+xgb 0.70926 → add
+> CatBoost 0.71038 → add the MLP 0.71096 → MLP alone 0.72312. Yet on validation the MLP was
+> the *best single family on both layouts* (A 0.6437 / B 0.5452 against lgb's 0.6452 / 0.5555)
+> and CatBoost was the best on layout A (0.6463). Both are net-negative on the test.
+>
+> **Both of my post-processing recommendations were measured and both lost badly.** §3.1 argued
+> for more aggressive spatial shrinkage at a larger radius; the closest available test of it,
+> a 500 km re-base at a=0.3, cost 0.0069. §3.2 argued for pulling the model toward the
+> long-term climatology; `sub_h_l10_clim1` cost 0.0208. I had reasoned from "recent anchors
+> lose to long-term anchors, so push further in that direction" — that was wrong. Long-term
+> *anchors* are not the same thing as more *shrinkage*, and the test set punishes shrinkage.
+>
+> **The story that fits all of it.** Session 3 already measured that this test period's error
+> is dominated by regional, spatially coherent month-to-month offsets (±0.3 globally in 2015),
+> not by white per-cell noise. Spatial smoothing and central shrinkage do nothing about
+> large-scale error while destroying real cell-scale signal, so they lose. And a regime shift
+> between the validation years and 2015–2018 punishes exactly the models with the capacity to
+> fit period-specific structure — the MLP memorises cell identity, which is why it wins on
+> layouts carved out of the training years and loses on the test.
+>
+> **So the productive direction is less capacity and less post-processing, not more.** Revised
+> priorities in §4c; §3.1 and §3.2 below are kept for the record but should not be run.
+> `postproc2.py` is still the right way to *measure* the smoothing question if you want to,
+> but adopt nothing from it on validation evidence alone — validation has now twice pointed
+> the wrong way on exactly this axis.
+
 No competition data was available in this environment (`out/`, `external/` and the CSVs are
 gitignored), so nothing here is a measured result. Everything below is either an analysis of
 the leaderboard record already in `NOTES.md`, or code that is ready to run and has been
@@ -173,6 +211,53 @@ early enough that its leaderboard answer arrives with days to spare.
 Freeze on Friday rather than Saturday if anything slips. A recipe that is 0.001 better but
 whose report and code are rushed is a bad trade when the leaderboard is half the score and
 the top twenty get read.
+
+## 4c. Revised priorities after the 7 Sep results
+
+Every probe below is a **reassembly of predictions already on disk** — no retraining, minutes
+of compute each. That is the whole point: the leaderboard is answering questions about blend
+composition and post-processing much faster than any retrain could.
+
+1. **Ablate the grid smoothing.** `final_assemble.py` has applied `smooth(w=0.7)` to every
+   submission ever made and it has **never been ablated on the leaderboard**. Two probes just
+   showed that smoothing-flavoured post-processing costs 0.007–0.021 on this test set, so the
+   one that has been in every file is now the obvious suspect. `SMOOTH_W` was added for this:
+
+   ```sh
+   SMOOTH_W=0   python final_assemble.py sub_m_lgbxgb_nosm  lgb_v5x_noll:0.5 xgb_v5x_noll:0.5
+   SMOOTH_W=0.35 python final_assemble.py sub_m_lgbxgb_sm35 lgb_v5x_noll:0.5 xgb_v5x_noll:0.5
+   ```
+   Highest expected value of anything left, because it is a single knob applied to the current
+   best file, and the prior from the last two results points against the current setting.
+
+2. **Split lgb and xgb.** The family ladder may not have bottomed out at two members.
+   ```sh
+   python final_assemble.py sub_m_lt_lgb lgb_v5x_noll:1.0
+   python final_assemble.py sub_m_lt_xgb xgb_v5x_noll:1.0
+   ```
+
+3. **Uniform training weights, lgb+xgb only.** `sub_j_lt_uniform` (built, unsubmitted) drops
+   the recent-year ramp — less recency, which is the direction the test keeps rewarding. But
+   as built it still contains the MLP and CatBoost, which now cost ~0.0017. Rebuild it without
+   them rather than submitting it as-is:
+   ```sh
+   TAG=_u python final_assemble.py sub_m_ltu_lgbxgb lgb_v5x_noll:0.5 xgb_v5x_noll:0.5
+   ```
+
+4. **More lgb and xgb seeds.** Still free, still no downside, and now it is the *only* thing
+   the ensemble is made of, so it matters more than before.
+
+5. **Do not submit `sub_i_both` and `sub_i_lt_both` as a pair.** They differ by RMS 0.0166, so
+   any gap between them below 0.00014 is unreadable — one of the two is a wasted slot. Both
+   also carry the MLP and CatBoost. Rebuild the both-anchor stack as lgb+xgb if you want to
+   test it at all:
+   ```sh
+   python final_assemble.py sub_m_both_lgbxgb lgb_allL_noll:0.5 xgb_allL_noll:0.5
+   ```
+
+Private-leaderboard slots: `sub_i_lt_lgbxgb` (0.709259) is the clear slot 1. Keep slot 2 free
+for whichever of the above wins, rather than spending it on `sub_i_lt_trees`, which differs
+from slot 1 only by the CatBoost component that the ladder says is harmful.
 
 ## 4b. Commands
 

@@ -183,3 +183,30 @@ Noise regime check (information at <= t only): RMS of the cell's deviation from 
   (CodeCarbon) -- all four already covered by REPORT.md section 5. Day-by-day schedule in SESSION9.md.
 - pipeline*.sh had the author's absolute macOS path hardcoded, so none of them would run for a
   reviewer. Now `cd "$(cd "$(dirname "$0")" && pwd)"` with `PY=${PY:-./.venv/bin/python}`.
+
+# Session 9b (7 Sep) — LB results: family ladder, and both post-processing directions refuted
+| file | public LB | note |
+|---|---|---|
+| sub_i_lt_lgbxgb (lgb .5 xgb .5) | **0.709259** | new best compliant |
+| sub_i_lt_trees (lgb .4 xgb .4 cat .2) | 0.710382 | CatBoost costs ~0.0011 |
+| sub_g_longterm (lgb .3 xgb .3 cat .15 mlp .25) | 0.710959 | previous best |
+| sub_h_l10_rb3_500 (500 km re-base a=0.3) | 0.717866 | +0.0069: MORE smoothing is worse |
+| sub_i_lt_mlp (MLP alone) | 0.723121 | +0.0121 |
+| sub_h_l10_clim1 (climatology pull) | 0.731800 | +0.0208: climatology pull is badly wrong |
+- Family ladder is monotone and runs OPPOSITE to validation: removing capacity always helps on the
+  test. lgb+xgb 0.70926 < +cat 0.71038 < +cat+mlp 0.71096 << mlp alone 0.72312. On validation the
+  MLP was the best single family on BOTH layouts (A 0.6437 / B 0.5452 vs lgb 0.6452 / 0.5555) and cat
+  was best on A (0.6463). Adopt lgb+xgb only; the MLP memorises cell identity, which pays on layouts
+  carved from the training years and fails across the 2015-18 regime shift.
+- Session 9's two recommendations are both REFUTED by these probes: more spatial shrinkage (§3.1) and
+  a climatology-anchored target (§3.2). The reasoning "recent anchors lose to long-term, so push
+  further that way" conflated long-term ANCHORS with more SHRINKAGE. Consistent with session 3's
+  measurement that the test error is regional and spatially coherent (+-0.3 global month-to-month
+  offsets in 2015), not white per-cell noise: smoothing cannot touch large-scale error but does
+  destroy real cell-scale signal.
+- Direction now: less capacity, less post-processing, more regularisation.
+- final_assemble.py gained SMOOTH_W (default 0.7, unchanged behaviour). The w=0.7 grid smooth is in
+  EVERY submission ever made and has never been LB-ablated -- top probe now that two smoothing-like
+  post-processes have just cost 0.007 and 0.021.
+- sub_i_both vs sub_i_lt_both differ by RMS 0.0166 (SE 6e-5): indistinguishable, do not spend two
+  slots on them. sub_j_lt_uniform differs from sub_i_lt_both by RMS 0.0390.

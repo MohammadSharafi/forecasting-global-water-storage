@@ -11,6 +11,9 @@ for name,w in spec:
               if re.fullmatch(rf"pred_FINAL_{re.escape(name)}_s\d+{re.escape(tag)}\.npy", os.path.basename(f)))   # exact seed files only
     assert fs, name
     p=np.mean([np.load(f) for f in fs],0); print(f"{name}: {len(fs)} seeds, mean change {np.mean(p-k):+.4f}"); acc+=float(w)*p; wsum+=float(w)
-p=acc/wsum; p=smooth(va,p,w=0.7,radius=1,iters=1)   # spatial smoothing only: same-month information. Trajectory smoothing removed (it used the next horizon's prediction, i.e. information after t).
+SW=float(os.environ.get("SMOOTH_W","0.7"))   # SMOOTH_W=0 disables it; never LB-ablated before session 9
+p=acc/wsum
+if SW>0: p=smooth(va,p,w=SW,radius=1,iters=1)   # spatial smoothing only: same-month information. Trajectory smoothing removed (it used the next horizon's prediction, i.e. information after t).
+print(f"smoothing w={SW}")
 assert np.isfinite(p).all() and len(p)==280961
 pl.DataFrame({"ID":va["ID"],"Target":np.round(p,6)}).write_csv(f"out/{out}.csv",float_precision=6); print("wrote",f"out/{out}.csv",len(p))
