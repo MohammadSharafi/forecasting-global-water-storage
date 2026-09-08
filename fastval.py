@@ -255,6 +255,12 @@ def anchor_of(kind, cells, ki, mn, Tsrc):
         return k
     if kind == "ap":
         return TMU[cells, mn - 1] + (k - TMU[cells, MOY[ki] - 1])
+    if kind == "apz":
+        # the same idea in standardised units: carry the anchor's z-score, not its raw
+        # departure, so a cell whose target month varies more than its anchor month is
+        # scaled rather than shifted
+        z = (k - TMU[cells, MOY[ki] - 1]) / TSD[cells, MOY[ki] - 1]
+        return TMU[cells, mn - 1] + z * TSD[cells, mn - 1]
     raise SystemExit(f"unknown anchor {kind!r}")
 
 

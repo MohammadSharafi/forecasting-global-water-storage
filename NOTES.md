@@ -1648,3 +1648,77 @@ rebuild and retrain for no gain: the two products are the same fields on the sam
 Leave them where they are. The box cut is the right request for a machine that has to download
 ERA5 fresh (a twentieth of the bytes), and it is what `cds_download.py` now asks for; it is not a
 reason to disturb data that is already on disk and already in the models.
+
+# Session 10c — the fast harness was measuring the wrong thing, and the residual anchor is a no
+
+## fastval's placements do not survive on this Train.csv
+
+Before spending the harness on a new idea, it was run on the incumbent settings to see whether it
+reproduced its own recorded numbers. It does not, and the reason is structural.
+
+`fastval` counts a horizon in INDEX steps of the months present in Train.csv: `h = ti - ki + 1`,
+the covariate window accumulates over `ki+1 .. ti`, and the answer is `T[:, ti+1]`. GRACE is
+missing 12 months of this record, so where a gap falls, one index step is two or three calendar
+months and a block laid across it asks for a multi-month lead while labelling it h=1.
+
+    record on this machine   149 months, 2002-05 .. 2015-09, 12 missing
+    start=100 (2010-12)      5 calendar months missing inside the 25-month window
+    start=118 (2012-09)      5 missing
+    start=136                reaches index 160, PAST THE END of a 149-month record
+
+All three defaults. And nothing measured on them reproduces here:
+
+                        recorded (10a)      this Train.csv
+    persistence             1.166               0.711
+    climatology             0.502               1.019
+    start=100 is            2010-08             2010-12
+    direct                  0.306               0.736
+
+The month index alone settles where those numbers came from: for MON[100] to be 2010-08 the record
+has to start 2002-04 and have no gaps, i.e. 161 contiguous months. This one has 149. They were
+produced on a different Train.csv, not on this one -- which also explains why 10a read persistence
+as the weakest baseline available when REPORT §1, the leaderboard's own 0.886 persistence line and
+this harness on real data all say it is the strongest simple one.
+
+The edits were ruled out first, not assumed innocent: the unmodified file from 20d46bd was run on
+start=100 and produced byte-identical output to the patched one.
+
+This is layout C's bug in a second place. `validation_c.py` searches for a placement the record can
+carry gap-free because a hardcoded offset silently truncated blocks; `fastval` now does the same --
+`check()` refuses a placement that straddles a gap or runs off the end and prints the ones that
+work (starts 12..77, 2003-08..2009-01), and training rows are held to the same standard. Verified:
+both old defaults are now refused with the reason and the alternatives.
+
+One limitation to state plainly: every gap-free window on this record lies in 2003-2009, so the
+harness cannot validate anything on the 2015-16 El Nino era that the test actually covers.
+
+## The residual anchor: measured, and rejected
+
+The idea was the best of the untested ones -- the model predicts `target - tws_known`, and under
+the test's horizon mix `tws_known` is a stale anchor, so the model spends capacity undoing it.
+Two replacements were tried, each trained on identical rows and scored on an identical mask so
+the anchor is the only difference:
+
+    ap   clim_next + (tws_known - clim_known)                      raw departure carried forward
+    apz  clim_next + z(tws_known) * sd_next                        the same in standardised units
+
+                   p1 (2003-12)   p2 (2006-04)   p3 (2008-08)
+    tws (incumbent)    0.7348         0.6312         0.6189
+    ap                 0.7294         0.6260         0.6205
+                      -0.0055        -0.0052        +0.0016      REJECTED: loses on p3
+    apz                0.7504         0.6426         0.6332
+                      +0.0156        +0.0114        +0.0143      REJECTED: loses everywhere
+
+`ap` is the interesting failure. It wins by 0.005 on two placements out of three, which is ten
+times the adoption threshold, and then loses on the third. The standing rule -- win on every
+layout -- rejects it, and the rule is right here: a change that is worth 0.005 twice and -0.002
+once is era-dependent, and the era the test covers (2015-16) is not one the harness can reach.
+
+`apz` is a clean loss and the reason is worth keeping: standardising divides by the anchor month's
+sd and multiplies by the target month's, so it carries the ratio of two noisy per-cell estimates
+into every prediction. The raw departure has no such term.
+
+Neither is dead, but neither is adoptable on this evidence. The cheap next measurement, if anyone
+returns to it, is `ap` inside the real pipeline rather than the 40-feature harness -- where
+`anom_persist` is already the single highest-gain feature (9.4% on layout A), which is itself
+evidence that the pipeline has largely found this signal through the feature rather than the anchor.
