@@ -1384,3 +1384,47 @@ could be zero. T4's round correction is the one with a clear mechanism: FINAL ha
 None of it closes the gap to 0.65. The five avenues closed on measurement in REPORT.md section 4
 still stand, and the dominant remaining error is still large-scale, spatially coherent and
 temporally white.
+
+# Session 10a -- ERA5 has never been in a single model
+
+Chasing the 0.6495 leaderboard cluster, the first thing checked was the cheapest: whether the
+covariates already provisioned are actually reaching the models. They are not.
+
+`build_mats.py:52` reads ERA5 only `if glob.glob("external/era5/*.nc")`, and that directory does
+not exist. Three independent confirmations:
+
+  * all four `out/night/build_*.log` print `era5: None` (and `gdo: not present`);
+  * `out/mats/feats.json` holds 201 features and not one of them starts with `e5`;
+  * the run report's external inventory lists ncep, ncep2, cpc and oni -- 15 files, no ERA5.
+
+So `features_era5.py`, `cds_download.py` and `ERA5_SETUP.md` have been dead code since session 8.
+Every leaderboard number this project has ever posted was produced without ERA5.
+
+What that costs is not a rounding error. The domain is 40x40 one-degree cells over tropical South
+America (lat -19.5..19.5, lon -79.5..-40.5) -- the Amazon, the eastern Andes and the Nordeste.
+Against that grid:
+
+  * NCEP-R1/R2 is ~1.9-2.5 degrees, so a single reanalysis cell covers four to six target cells,
+    and it carries latent heat flux rather than evaporation;
+  * ERA5 is one degree and lands on the target grid exactly, and carries evaporation, runoff and
+    a four-layer soil column (0-7, 7-28, 28-100, 100-289 cm) directly;
+  * the family that produced the entire session-9 leaderboard gain was the per-cell standardised
+    anomalies of exactly these fields. `features_anom.build` is already called for ERA5 at
+    `build_mats.py:79`; it has simply always received `None`.
+
+Two guards were wrong in a way that would have hidden the fix as well:
+
+  * `src_guard build_` fingerprinted the feature SOURCE files only. Downloading ERA5 changes no
+    source file, so the cached `A_tr.parquet` would have been reused and the new data would never
+    have reached a model. The external files are now fingerprinted too (`$S/extinv.txt`, name and
+    byte count of every .nc/.parquet/.data under external/), so arriving data invalidates the
+    matrices exactly as edited code does.
+  * `run_tonight.sh` had no ERA5 step at all. T0 now downloads it when `~/.cdsapirc` exists,
+    and otherwise says plainly that it is absent and points at ERA5_SETUP.md, without failing
+    the run.
+
+Note for whoever adds variables later: snow is dead weight in this domain. `e5SWE` (from `sd`) and
+NCEP's `weasd` are ~zero over a box that stops at 19.5N, so they cost features and buy nothing
+outside a few Andean cells. The four `swvl` layers are currently collapsed into one `SW` column by
+a fixed-thickness weighted sum; the profile shape (fast top layer against slow bottom layer) is
+thrown away and is worth carrying separately once ERA5 is actually present.
