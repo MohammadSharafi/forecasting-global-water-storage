@@ -95,6 +95,11 @@ def main():
                   f"   <- if this is near zero the offset is temporally white and NOT correctable")
 
     # ---- zonal: is the shift hemispheric rather than global?
+    #
+    # This section carries the largest prize the project has measured, so it gets the same
+    # reachability test as the global offset above rather than only an oracle. An oracle is not
+    # an opportunity: it needs the answer to compute the correction. What decides whether the
+    # band offset is worth building is whether it can be PREDICTED from information at <= t.
     band = ((va["lat"].to_numpy() + 90) // 30).astype(int)
     dz = pl.DataFrame({"m": months, "b": band, "t": dy_true, "q": dy_pred})
     gz = dz.group_by(["m", "b"]).agg(pl.col("t").mean().alias("true"), pl.col("q").mean().alias("pred"))
@@ -106,9 +111,46 @@ def main():
     print(f"    share of total MSE that is band-offset error: {sharez*100:.1f}%")
     print(f"    ORACLE, perfect band correction: RMSE {rmse(p + offz):.4f}   "
           f"({rmse(p+offz)-rmse(p):+.4f})")
+    # is the BAND offset predictable from the previous month's band offset?
+    ms = sorted({m for m, _ in key})
+    bs = sorted({b for _, b in key})
+    prevb = {(m, b): key[(ms[i - 1], b)] for i, m in enumerate(ms) if i > 0
+             for b in bs if (ms[i - 1], b) in key and (m, b) in key}
+    if prevb:
+        offz_p = np.array([prevb.get((m, b), 0.0) for m, b in zip(months, band)])
+        print("\n    is any of it REACHABLE? apply the PREVIOUS month's band offset:")
+        for a in (0.25, 0.5, 0.75, 1.0):
+            print(f"      a={a:.2f}: RMSE {rmse(p + a*offz_p):.4f}   ({rmse(p+a*offz_p)-rmse(p):+.4f})")
+        pv = np.array([prevb[k] for k in sorted(prevb)])
+        cv = np.array([key[k] for k in sorted(prevb)])
+        if len(pv) > 3 and pv.std() > 1e-12 and cv.std() > 1e-12:
+            r = float(np.corrcoef(pv, cv)[0, 1])
+            print(f"      corr(previous band offset, this band offset) = {r:+.3f}   over {len(pv)}"
+                  f" band-months")
+            print("      near zero means the band offset is temporally white: the oracle above is"
+                  " unreachable")
+
+    # and is it predictable from what the band ITSELF has recently been observed doing? That is
+    # information at <= t_known, so a correction built on it would be legal. The zonal features
+    # already expose this per cell; this asks whether it survives at band level, where the error is.
+    kb = pl.DataFrame({"m": months, "b": band, "k": k}).group_by(["m", "b"]).agg(
+        pl.col("k").mean().alias("kbar")).sort(["b", "m"])
+    kb = kb.with_columns(pl.col("kbar").diff().over("b").alias("dk"))
+    dmap = {(m, b): d for m, b, d in zip(kb["m"].to_list(), kb["b"].to_list(),
+                                         kb["dk"].to_list()) if d is not None}
+    both = [(dmap[x], key[x]) for x in dmap if x in key]
+    if len(both) > 5:
+        a1 = np.array([x for x, _ in both]); a2 = np.array([y for _, y in both])
+        if a1.std() > 1e-12 and a2.std() > 1e-12:
+            print(f"\n    corr(band's own recent observed change, its offset) = "
+                  f"{float(np.corrcoef(a1, a2)[0, 1]):+.3f}   over {len(both)} band-months")
+            print("      this one uses only observations, so a correction built on it would be"
+                  " legal --")
+            print("      but the zonal features already give the model this signal per cell.")
+
     print("\n  Read it this way: the oracle rows bound the prize. If they are small, no global or")
     print("  zonal correction can help and this avenue is closed. If they are large, the")
-    print("  persistence row says whether any of it is reachable with information at <= t.")
+    print("  reachability rows decide whether any of it can actually be taken.")
 
 
 if __name__ == "__main__":

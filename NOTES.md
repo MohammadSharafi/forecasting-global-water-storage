@@ -866,3 +866,74 @@ of 0.00047 RMSE per rank it is worth roughly 28 places from rank 82.
 diag2_ceiling_A now decides ERA5-Land on arithmetic rather than hope: with validation shown to
 transfer, its measured headroom is a forecast of leaderboard gain, and ERA5-Land is the only
 remaining single idea large enough to close 0.0063. Read it first.
+
+# Session 9q — rank 82 -> 55, what the three controls settled, and three real defects
+
+Public leaderboard, same models and same seeds, differing only in post-processing:
+
+  sub_q_main       tuned smoothing + calibration   0.696326352
+  sub_q_main_nocal tuned smoothing, no calibration 0.695964865   <- best
+  sub_q_main_nosm  no smoothing, calibration       0.699149222
+
+  smoothing   removing it COSTS  0.002823   -> keep it
+  calibration removing it GAINS  0.000361   -> drop it
+
+Rank 82 -> 55 on one submission. The controls paid for themselves the first time they were used:
+without them the calibrated file would have been submitted as the best and 0.00036 thrown away.
+
+## Defect 1: the calibration is the one stage whose held-out gate did not transfer
+postcal's leave-one-layout-out gate ADOPTED the scale form (a = 1.130, 1.105, 1.029, 0.972,
+0.988, 0.982, 1.000) and the leaderboard says it is worse. Everything else this session predicted
+its own leaderboard result closely; this did not. The likely mechanism is visible in analyze_A:
+the model's bias at h=1 is +0.0917, by far the largest of any horizon, and the calibration
+MULTIPLIES the h=1 predicted change by 1.13 -- amplifying a quantity that is already too large.
+A scale through the origin cannot see a bias, and the affine form that could was rejected by the
+same gate. Calibration is now OFF by default (USE_CALIB=1 to apply) and the calibrated file is
+produced as the control instead of the uncalibrated one.
+
+## Defect 2: layout C was structurally broken and voted anyway
+On the real Train.csv the hardcoded 40-month shift put block months inside GRACE's gaps, so blocks
+were truncated: 140,491 rows instead of ~280,000, horizons 3, 5, 6 and 7 EMPTY, and a horizon mix
+of .445/.110/0/.111/0/0/0 against the test's .333/.222/.167/.111/.056/.056/.056. select_config
+used it as a third vote, and it changed the answer: A+B alone had chosen DROPF='' with no horizon
+reweighting, while A+B+C chose DROPF='scale,bigsa' with HMIX='test'. A layout that cannot score
+four of seven horizons is not a weaker vote, it is a wrong one.
+
+validation_c.py now SEARCHES every placement of the [1,3,4,7,1,2] pattern at the test's exact
+spacing and keeps the latest one whose months train actually has, so the geometry is exact by
+construction. If no gap-free placement exists it says so loudly, and it EXITS NON-ZERO when any
+horizon is empty so the layout can never silently become a vote again. Verified on a fixture:
+planting a gap inside the chosen placement's 7-month block makes it slide from 2012-05 to 2011-11
+and stay exact, rather than truncate.
+
+Note the configuration that scored 0.695965 was chosen WITH the broken C in the vote. It is a
+good configuration; it is not necessarily the one A+B+working-C would pick.
+
+## Defect 3: globalshift measured the largest prize in the project and never tested reachability
+The band-offset decomposition on the real data says 13.0% of total MSE is per-latitude-band offset
+error, with an oracle of -0.0423 RMSE. That is almost exactly the 0.0400 gap to the top ten. But an
+oracle is not an opportunity -- it needs the answer to compute the correction. globalshift tested
+reachability for the GLOBAL offset (persistence corr -0.081, dead) and never for the band offset,
+which is four times larger. It now runs the same test per band, plus a second one asking whether
+the offset is predictable from what the band itself has recently been OBSERVED doing, which would
+be legal since it uses only months <= t_known.
+
+## What analyze_A says about where the error actually is
+- residual spatial correlation: lag 1 +0.967, lag 2 +0.899, lag 3 +0.809, lag 5 +0.621, lag 8
+  +0.447. The error field is extremely coherent -- it is REGIONAL, not per-cell noise. Two
+  consequences: smoothing can only ever take a little (a neighbour's error is nearly the same
+  error), which matches the measured 0.0028; and higher-resolution forcing such as ERA5-Land is
+  the least likely thing to help, because the error does not live at fine scales.
+- h=1 carries 31.7% of the test-weighted MSE, more than any other horizon, and has bias +0.0917.
+- the model is worse than plain persistence on 38-45% of rows at every horizon.
+- 25% of the error comes from 8.7% of cells; the 20 worst cells carry only 0.67%, so there is no
+  small set of pathological cells to fix.
+- ceiling.py on the real data: raw e5PER_acc r = 0.004, anomaly encoding r = 0.177; raw e5P_acc
+  r = -0.032, anomaly r = 0.235. The session-5 E2 artifact is confirmed on real data at a factor
+  of roughly 60. The linear ridge bound on the whole anomaly block is R^2 = 0.050 on the change.
+
+## Standing
+0.695965 at rank 55. The 0.69 target is 0.0060 away and reachable. The top ten begins at
+0.655935, which is 0.0400 away -- three times everything session 9 has gained. That gap will not
+close on incremental feature work, and the honest reading of the diagnostics is that the
+remaining large-scale error is regional and, so far, not shown to be predictable.

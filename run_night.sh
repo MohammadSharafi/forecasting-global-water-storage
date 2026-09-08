@@ -212,7 +212,14 @@ HB=${FINAL_H1BETA:-0}
 # calibration is fitted on the SMOOTHED prediction, because that is the order it is applied in
 step postcalscan "$PY postcal.py '$BLEND' > out/calib.sh" || true
 if [ -s out/calib.sh ]; then cat "$S/postcalscan.log" >> "$R"; . ./out/calib.sh; fi
-CB=${FINAL_CALIB-}; CBB=${FINAL_CALIB_B-}
+# The public leaderboard REFUTED the calibration on 2026-09-08: with the same models and the
+# same smoothing, applying it scored 0.696326 and dropping it scored 0.695965. postcal's
+# leave-one-layout-out gate had adopted it, so this is the one stage where the held-out score did
+# not predict the leaderboard -- the h=1 scale of 1.13 amplifies a prediction that already carries
+# a +0.09 bias at h=1. It is therefore OFF by default and has to be asked for.
+CB=""; CBB=""
+if [ "${USE_CALIB:-0}" = 1 ]; then CB=${FINAL_CALIB-}; CBB=${FINAL_CALIB_B-}
+else say "  calibration computed but NOT applied (refuted on the leaderboard; USE_CALIB=1 to apply)"; fi
 say "post-processing: smoothing w1=$SW1 w7=$SW7 r=$SR it=$SI wrap=$SP | h1 beta=$HB"
 say "  calibration scale='${CB:-none}' offset='${CBB:-none}'"
 
@@ -306,8 +313,10 @@ head1 "PHASE 9  submissions, audit, report"
 if done_ "F_f1_${FM}_s0"; then
   asm sub_q_main      _f1 "$MEMBERS" ""     # the tuned post-processing
   asm sub_q_main_nosm _f1 "$MEMBERS" 0      # no smoothing at all, as a control
-  CBK=$CB; CBBK=$CBB; CB=""; CBB=""                      # no calibration at all, as a control
-  asm sub_q_main_nocal _f1 "$MEMBERS" ""; CB=$CBK; CBB=$CBBK
+  # calibration is off by default now, so the informative control is the calibrated file
+  CBK=$CB; CBBK=$CBB; CB=${FINAL_CALIB-}; CBB=${FINAL_CALIB_B-}
+  [ -n "$CB" ] && asm sub_q_main_cal _f1 "$MEMBERS" ""
+  CB=$CBK; CBB=$CBBK
 fi
 ALT=lgbs; [ "$FM" = lgbs ] && ALT=lgb
 done_ "F_f2_${ALT}_s0" && asm sub_q_alt _f2 "${ALT}_v5x_noll:$WL xgb_v5x_noll:$WX" ""
@@ -319,7 +328,7 @@ done_ compliance || say "COMPLIANCE AUDIT FAILED OR INCOMPLETE -- read $S/compli
 head1 "REPORT"
 say "elapsed: $(elapsed_h) h of a ${BUDGET_H} h budget"
 say "files ready to upload:"
-for f in out/sub_q_main.csv out/sub_q_main_nosm.csv out/sub_q_main_nocal.csv out/sub_q_alt.csv \
+for f in out/sub_q_main.csv out/sub_q_main_nosm.csv out/sub_q_main_cal.csv out/sub_q_alt.csv \
          out/sub_q_base.csv out/sub_n_anom_lgbxgb.csv out/backup_pre_anom/sub_i_lt_lgbxgb.csv; do
   [ -f "$f" ] && say "  $f"
 done
