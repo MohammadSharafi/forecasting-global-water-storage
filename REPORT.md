@@ -109,7 +109,8 @@ statistics; **great-circle smoothed anchors** at 300/500/800/1500/2500 km, with 
 scaled by 1/cos(latitude) so the neighbourhood is a physical radius rather than a grid box;
 covariates at t (never masked) and at the last observed month; the covariate anomalies of §3.1 plus
 3/6/12-month antecedent windows ending at t; a modelled total-water-storage composite (soil water +
-snow); zonal context; and calendar month. **Latitude and longitude are not features** (§5).
+snow); zonal context; calendar month; and, where downloaded, Copernicus GDO
+long-window SPI and fAPAR (see `GDO_SETUP.md`). **Latitude and longitude are not features** (§5).
 
 ## 4. Avenues closed on evidence
 
@@ -121,7 +122,7 @@ because each one stopped effort being spent in the wrong place.
 | global monthly offset correction | 2.9% of MSE, oracle −0.0090, persistence corr **−0.110** | temporally white; unreachable |
 | per-latitude-band offset | 12.9% of MSE, oracle **−0.0418**, persistence corr +0.190 | every correction weight tried made it worse; a linear predictor with r=0.19 can remove only r² of it, ≤0.0015 in sample |
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
-| recursive forecasting (explicitly permitted) | one-step error in the level 0.6220 vs direct overall RMSE 0.6260 | one-step prediction is no more accurate than multi-step, so recursion inherits its full error as an anchor — a floor of 0.6220 against direct 0.5345 at h2 and 0.5491 at h3, 39% of the test by weight |
+| recursive forecasting (explicitly permitted) | one-step error in the level 0.6220 vs direct overall RMSE 0.6260 | one-step prediction is no more accurate than multi-step, so recursion inherits its full error as an anchor — a floor of 0.6220 against direct 0.5345 at h2 and 0.5491 at h3, 39% of the test by weight. This is a **bound**, not a measurement: `recursive.py` implements the chained forecast and reports direct-versus-recursive RMSE per horizon, and settles it empirically. **[pending]** |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
 
 Together these say something specific about the remaining error: it is **large-scale, spatially

@@ -71,6 +71,11 @@ DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "gdo"   in DROPF:
+    # the GDO block shares the an_ prefix with the ERA5/NCEP anomalies, so without its own switch
+    # its contribution could never be measured separately from theirs
+    from features_gdo import PRODUCTS
+    F=[f for f in F if not any(f.startswith("an_"+p+"z") for p in PRODUCTS)]
 if DROPF: print(f"  dropped {sorted(DROPF)}: {len(F)} features remain",flush=True)
 AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
 def base_of(df):

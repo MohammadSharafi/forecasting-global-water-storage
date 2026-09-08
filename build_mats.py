@@ -16,6 +16,7 @@ from features_era5 import load_era5, add_era5, ERA5F
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
 from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 from features_scale import add_scale, SCALE
+from features_gdo import load_gdo
 
 
 def prepare(L, t0=None):
@@ -29,8 +30,13 @@ def prepare(L, t0=None):
     tr = pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
     lats = tr["lat"].unique().to_list(); lons = tr["lon"].unique().to_list()
     nc, cols = load_ncep(lats, lons); nc2, cols2 = load_ncep2(lats, lons); cpc, cols3 = load_cpc(lats, lons)
+    # Copernicus GDO: long-window SPI and fAPAR. Both are LEVELS, so they only become usable after
+    # the same per-cell standardisation that made the ERA5/NCEP block work. Absent unless
+    # downloaded, and a no-op when absent, exactly like ERA5.
+    gdo, gcols = load_gdo(lats, lons)
     ERA = load_era5() if glob.glob("external/era5/*.nc") else None
     print("era5:", None if ERA is None else ERA.shape, flush=True)
+    print("gdo:", gcols or "not present", flush=True)
     print("ext loaded", cols, cols2, cols3, f"({time.time()-t0:.0f}s)", flush=True)
     if L == "FINAL":
         te = pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
@@ -57,7 +63,10 @@ def prepare(L, t0=None):
     nc = add_mtws(nc, "SW", "SWE", "MTWS")                   # both already mm
     ANOM = [x for x in (anom_build(ERA, ERA5_STORAGE, ERA5_FLUX, HM),
                         anom_build(nc, NCEP_STORAGE, NCEP_FLUX, HM),
-                        anom_build(cov_all.select(["lat", "lon", "time"]+COV_STORAGE).unique(["lat", "lon", "time"]), COV_STORAGE, [], HM)) if x is not None]
+                        anom_build(cov_all.select(["lat", "lon", "time"]+COV_STORAGE).unique(["lat", "lon", "time"]), COV_STORAGE, [], HM),
+                        # SPI and fAPAR are indices/levels, so storage-like: z-scored value at t
+                        # and at t_known, their difference, and the 3/6/12-month antecedent windows
+                        anom_build(gdo, gcols, [], HM)) if x is not None]
     print("anomaly tables:", [(len(sz), len(fz)) for _, sz, fz in ANOM], f"({time.time()-t0:.0f}s)", flush=True)
 
     def featfn(rows, obs, loyo):

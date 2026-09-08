@@ -1084,8 +1084,17 @@ even with a perfect step model. Against the direct model's 0.5345 at h2 and 0.54
 the test by weight -- recursion loses before any compounding at all. The horizons where the floor
 looks favourable (h4-h6, 22% of weight) are the ones where the direct error is inflated by calendar
 month rather than by staleness: layout A's h6 is one specific June, which carries a +0.29 bias and
-an RMSE of 1.07, and feeding predictions forward does not fix June. Not built. The reasoning is
-recorded so it is not re-proposed.
+an RMSE of 1.07, and feeding predictions forward does not fix June.
+
+CORRECTION (session 9w). The sentence that stood here said "Not built", and that is wrong: the same
+session added `recursive.py`, a 160-line measurement script that chains horizon-1 predictions
+through build_mats.prepare's own feature builder and prints direct-versus-recursive RMSE per
+horizon under the test mix. It does not touch the submission. Having both is right and the note was
+simply inaccurate -- but the distinction matters, because the argument above is a BOUND derived
+from numbers that are confounded with calendar month (layout A's h6 is one specific June), while
+the script is the measurement that would settle it. The bound predicts recursion loses; it has not
+yet been run on real data to confirm that. Run `python recursive.py A` (and B, C) if there is time;
+if the measurement disagrees with the bound, the measurement wins.
 
 ## Seasonal forecasts: do NOT use them, the rules contradict each other on exactly this
 A competitor asked whether GDO seasonal forecasts -- issued in month t, covering t+1 to t+6 --
@@ -1199,3 +1208,43 @@ One consequence worth stating: if the configuration does NOT change, FINAL train
 again and no emissions are recorded, because CodeCarbon measures training that actually happens.
 Getting the sustainability number therefore requires at least one configuration to be trained under
 CARBON=1 -- which the config change will force, and which FORCE=1 can force otherwise.
+
+# Session 9w — GDO wired end to end, and a correction to the record
+
+## features_gdo.py -> build_mats
+`load_gdo` reads `external/gdo/<product>/*.nc` and hands the result to `features_anom.build`, the
+same per-cell standardisation that produced this project's only large leaderboard gain. That is the
+whole point: SPI and fAPAR are LEVELS, and a model with no location features cannot use a level --
+which is exactly the mistake that cost four sessions with the ERA5 block.
+
+Products recognised: spi09, spi24, spi48, fapar, fapanom, smanom. Each yields six features -- the
+z-scored level at t and at t_known, their difference, and 3/6/12-month antecedent windows ending
+at t.
+
+Verified on synthetic files built to have the quirks the real ones have, each case separately:
+several files per product concatenated in time; `latitude`/`longitude` as well as `lat`/`lon`; 0-360
+longitudes folded; a bounds variable beside the data variable; a stray singleton dimension; and
+DEKADAL data averaged to monthly. Then end to end through build_mats:
+
+  with two products present   201 -> 213 features, the 12 named exactly as expected
+  DROPF=gdo                   213 -> 201, removing exactly those 12 and nothing else
+  directory absent            "gdo: not present", 201 features, a clean no-op
+
+The dedicated `DROPF=gdo` switch exists because the block shares the `an_` prefix with the ERA5 and
+NCEP anomalies; without it, its contribution could never be measured separately from theirs.
+`GDO_SETUP.md` documents what to download, what is deliberately NOT downloaded (the GRACE layer,
+and the seasonal forecasts) and how to ablate it. `src_guard build_` already covers
+features_gdo.py, so adding the data invalidates the cached matrices automatically.
+
+## Correction: recursive forecasting WAS built, as a measurement
+Session 9t's note said "Not built", and the same session added `recursive.py` -- 160 lines that
+chain horizon-1 predictions through build_mats.prepare's own feature builder and print
+direct-versus-recursive RMSE per horizon under the test mix, touching no submission. The note was
+simply wrong, and it mattered: a reviewer reading the repo would have found a script contradicting
+the log.
+
+The distinction is worth keeping straight. The argument in 9t is a BOUND, and it rests on numbers
+confounded with calendar month -- layout A's h6 is one specific June with a +0.29 bias. The script
+is the MEASUREMENT. The bound predicts recursion loses; it has not been run on real data to confirm
+that. If the measurement disagrees with the bound, the measurement wins. NOTES and REPORT now say
+so, and REPORT carries it as a [pending] rather than as a settled result.
