@@ -209,6 +209,17 @@ step hsplicescan "$PY hsplice.py '$BLEND' '${FM}_v5x_noll:_h1' > out/h1beta.sh" 
 if [ -s out/h1beta.sh ]; then cat "$S/hsplicescan.log" >> "$R"; . ./out/h1beta.sh; fi
 HB=${FINAL_H1BETA:-0}
 
+# The per-calendar-month bias is the one offset the diagnostics say should be REACHABLE: the
+# global and band offsets are temporally white and were both closed on evidence, but a calendar
+# month recurs every year, so an estimate from other years is a legal prediction for this one.
+# It also removes the confound that broke postcal -- within a layout, horizon is nearly a proxy
+# for calendar month, so per-horizon coefficients are really per-month ones fitted to the wrong
+# index and then applied to different months entirely.
+step seasonscan "$PY seasonal.py '$BLEND' > out/season.sh" || true
+if [ -s out/season.sh ]; then cat "$S/seasonscan.log" >> "$R"; . ./out/season.sh; fi
+SE=${FINAL_SEASON-}
+[ -n "$SE" ] && say "  seasonal bias correction adopted: $SE" || say "  no seasonal bias correction"
+
 # calibration is fitted on the SMOOTHED prediction, because that is the order it is applied in
 step postcalscan "$PY postcal.py '$BLEND' > out/calib.sh" || true
 if [ -s out/calib.sh ]; then cat "$S/postcalscan.log" >> "$R"; . ./out/calib.sh; fi
@@ -288,6 +299,7 @@ train_final() {   # train_final <tag> <dropf> <weights> <hmix> <families...>
 asm() {  # asm <name> <tag> <members> <smoothing override, empty = the tuned one>
   env="TAG=$2"
   if [ -n "$4" ]; then env="$env SMOOTH_W=$4 SMOOTH_W1=$4 SMOOTH_W7=$4 SMOOTH_R=1 SMOOTH_IT=1 SMOOTH_WRAP=0"; fi
+  [ -n "$SE" ] && env="$env SEASON=$SE"
   [ -n "$CB" ] && env="$env CALIB=$CB"
   [ -n "$CBB" ] && env="$env CALIB_B=$CBB"
   if [ "$HB" != "0" ] && [ "$HB" != "0.00" ] && done_ "FH1_${FM}_s0"; then
@@ -337,6 +349,7 @@ if done_ "F_f1_${FM}_s0"; then
   CBK=$CB; CBBK=$CBB; CB=${FINAL_CALIB-}; CBB=${FINAL_CALIB_B-}
   [ -n "$CB" ] && asm sub_q_main_cal _f1 "$MEMBERS" ""
   CB=$CBK; CBB=$CBBK
+  if [ -n "$SE" ]; then SEK=$SE; SE=""; asm sub_q_main_noseason _f1 "$MEMBERS" ""; SE=$SEK; fi
 fi
 ALT=lgbs; [ "$FM" = lgbs ] && ALT=lgb
 done_ "F_f2_${ALT}_s0" && asm sub_q_alt _f2 "${ALT}_v5x_noll:$WL xgb_v5x_noll:$WX" ""
@@ -348,7 +361,7 @@ done_ compliance || say "COMPLIANCE AUDIT FAILED OR INCOMPLETE -- read $S/compli
 head1 "REPORT"
 say "elapsed: $(elapsed_h) h of a ${BUDGET_H} h budget"
 say "files ready to upload:"
-for f in out/sub_q_main.csv out/sub_q_main_nosm.csv out/sub_q_main_cal.csv out/sub_q_alt.csv \
+for f in out/sub_q_main.csv out/sub_q_main_nosm.csv out/sub_q_main_cal.csv out/sub_q_main_noseason.csv out/sub_q_alt.csv \
          out/sub_q_base.csv out/sub_n_anom_lgbxgb.csv out/backup_pre_anom/sub_i_lt_lgbxgb.csv; do
   [ -f "$f" ] && say "  $f"
 done

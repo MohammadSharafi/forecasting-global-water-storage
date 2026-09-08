@@ -8,7 +8,8 @@ The prediction is built in the order the post-processing was fitted in (session 
   1. weighted blend of the model families                       (blend_scan.py chose the weight)
   2. horizon-1 specialist spliced in, if one was adopted        (hsplice.py chose beta)
   3. spatial smoothing of the residual field                    (smooth_scan.py chose w/r/iters)
-  4. per-horizon calibration of the residual magnitude          (postcal.py chose the scales)
+  4. per-calendar-month bias correction                         (seasonal.py chose the offsets)
+  5. per-horizon calibration of the residual magnitude          (postcal.py chose the scales)
 
 Every stage is off unless its environment variable is set, and each scan writes that variable
 only when the gain survived leave-one-layout-out validation, so a stage that could not prove
@@ -18,6 +19,7 @@ env
   TAG          prediction-file suffix for the blend members, e.g. TAG=_f1
   SMOOTH_W     legacy single smoothing weight (default 0.7); SMOOTH_W=0 turns smoothing off
   SMOOTH_W1 SMOOTH_W7 SMOOTH_R SMOOTH_IT SMOOTH_WRAP   the tuned smoothing
+  SEASON       'm:b,..' bias to subtract, by TARGET calendar month (1-12)
   CALIB        'a1,..,a7' per-horizon scale of the predicted change
   CALIB_B      'b1,..,b7' per-horizon offset, when postcal adopted the affine form
   H1SPEC H1TAG H1BETA   the horizon-1 specialist stem, its file suffix, and its blend weight
@@ -67,6 +69,17 @@ WRAP = os.environ.get("SMOOTH_WRAP", "0") == "1"
 if max(w1, w7) > 0:
     p = smooth_field(va, p, horizon_w(h, w1, w7), R, IT, WRAP)
 print(f"smoothing w1={w1} w7={w7} radius={R} iters={IT} wrap={WRAP}")
+
+# --- per-calendar-month bias (seasonal.py). The target is t+1, so the month that owns the bias
+# is the month AFTER the row's `time`.
+SEASON = os.environ.get("SEASON", "").strip()
+if SEASON:
+    b = np.zeros(13)
+    for part in SEASON.split(","):
+        mm, bb = part.split(":"); b[int(mm)] = float(bb)
+    tm = np.array([(d.month % 12) + 1 for d in va["time"].to_list()])
+    p = p - b[tm]
+    print("seasonal " + " ".join(f"m{m}={b[m]:+.3f}" for m in range(1, 13) if b[m]))
 
 # --- per-horizon calibration of the predicted change (postcal.py)
 CAL = os.environ.get("CALIB", "").strip()

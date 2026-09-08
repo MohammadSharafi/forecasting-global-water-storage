@@ -984,3 +984,61 @@ with the broken layout C voting, and the rerun with C fixed will very likely cho
 the seed count -- and discards that tag's markers when any of it changes, printing the old and new
 signatures. Verified on a fixture: identical configuration keeps all three markers, a changed one
 discards them and says why.
+
+# Session 9s — the offset that IS reachable, and a training-set size nobody ever swept
+
+## The seasonal bias: -0.0060 on the table, and periodic by construction
+analyze_A's target-month table, on the submitted blend:
+
+  month  6   bias +0.2912   16.1% of MSE        month  2   bias +0.0600   18.0% of MSE
+  month 10   bias -0.1262    3.4% of MSE        month  9   bias +0.0585    6.2% of MSE
+  month 11   bias -0.0774    6.3% of MSE        month 12   bias +0.0549   11.8% of MSE
+
+Row-weighted mean squared bias 0.00747. Removing all of it: RMSE 0.6260 -> 0.6200, i.e. -0.0060 --
+four times the best case the band offset could ever have given, and the same size as the gap to
+the 0.69 target.
+
+WHY THIS ONE IS DIFFERENT FROM THE TWO CLOSED AVENUES. The global and band offsets failed because
+they are temporally white: nothing at time <= t predicts them (persistence corr -0.110 and +0.190).
+A calendar-month effect is periodic by construction -- June recurs every year -- so an estimate
+built from other years IS a legal prediction for this one. That is a property of the quantity, not
+an assumption about it.
+
+IT ALSO EXPLAINS WHY postcal FAILED ON THE LEADERBOARD. postcal fitted per HORIZON, and inside one
+of these layouts horizon is very nearly a proxy for calendar month: layout A's 7-month block
+supplies its h7 rows from exactly one target month, its h6 rows from one other, and so on. Fitting
+"per horizon" on layout A is really fitting "per those particular months", which the test then
+applies to entirely different months. Its leave-one-layout-out gate could not catch this because
+both layouts share the confound. Indexing by the month itself removes it.
+
+WHY THE MODEL HAS NOT ABSORBED IT ALREADY. `m_next` IS in FEATS2, so this is not a missing input.
+But a gradient-boosted tree optimises local squared error, and a small additive offset spread
+evenly across every cell in a month buys almost no split gain anywhere while costing real MSE in
+aggregate. One additive number expresses what the tree would need many splits to approximate.
+
+seasonal.py estimates the bias per target calendar month on the OTHER layouts and scores it on the
+held-out one, shrinks it, clips it at 0.25, zeroes any month the fitting layouts do not cover, and
+prints how many distinct month-years back each coefficient -- because a "seasonal" effect measured
+from one June is not a seasonal effect. Verified on two fixtures:
+  * a planted seasonal bias (June +0.29, Oct -0.13, Feb +0.06) is recovered almost exactly
+    (+0.298, -0.116, +0.085) and adopted, with held-out gains on all three layouts;
+  * a per-layout constant offset that is NOT seasonal is REJECTED -- and it fails in exactly the
+    shape that killed postcal, helping two layouts and hurting the third badly.
+final_assemble applies it to the TARGET month (t+1, not t); verified that the shift lands on
+precisely the intended months and nowhere else.
+
+`sub_q_main_noseason` is produced as a control, so the leaderboard judges this the same way it
+judged smoothing and calibration rather than validation having the last word.
+
+## PER_ROW: the training set has been a third smaller all session, by accident
+build_mats.py draws PER_ROW (t, t_known) pairs per cell-month, and its own default is 3.
+run_night.sh passes 2. That was not a decision; it was a value typed into the orchestrator, and it
+means every run this session trained on about a third fewer rows than the pipeline that produced
+the earlier submissions. It has never been swept -- not in any session, on any layout.
+
+More rows per cell-month is not free (build time and training time both scale with it) and it is
+not obviously better either: the extra pairs reuse the same underlying observations, so they add
+coverage of the (horizon, staleness) space rather than independent information. But a 200-feature
+model on a third more rows is exactly the kind of change that is worth an hour to measure, and
+nobody has. PER_ROW=3 and PER_ROW=4 on layouts A and B, scored under the test mix, is the next
+cheap experiment.
