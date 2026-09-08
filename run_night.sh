@@ -26,6 +26,10 @@
 # It ends with out/RUN_REPORT.md: the configuration, the held-out evidence behind every adopted
 # change, the data and error analysis, and the compliance audit, in one file.
 cd "$(cd "$(dirname "$0")" && pwd)"; PY=${PY:-./.venv/bin/python}
+# The sustainability criterion is judged on emissions measured WHILE training runs; the organisers
+# were explicit that it cannot be reconstructed afterwards, and that a top-ten placing needs it.
+# So every training run this orchestrator starts is instrumented, and phase 9 totals them.
+export CARBON=${CARBON:-1}
 M=out/mats; S=out/night; mkdir -p "$M" "$S"
 SEEDS=${SEEDS:-8}; [ "${DEEP:-0}" = 1 ] && SEEDS=${SEEDS_DEEP:-16}
 WIDE=${WIDE:-${DEEP:-0}}                  # extra model families, so the stack has something to fit
@@ -356,6 +360,7 @@ done_ "F_f2_${ALT}_s0" && asm sub_q_alt _f2 "${ALT}_v5x_noll:$WL xgb_v5x_noll:$W
 [ "${DEEP:-0}" = 1 ] && done_ "F_f3_lgb_s0" && asm sub_q_base _f3 "lgb_v5x_noll:$WL xgb_v5x_noll:$WX" ""
 
 step compliance "$PY compliance.py FINAL" || true
+astep carbon "$PY carbon_report.py" || say "  emissions not summarised (was CARBON=1 set for the training runs?)"
 done_ compliance || say "COMPLIANCE AUDIT FAILED OR INCOMPLETE -- read $S/compliance.log before submitting"
 
 head1 "REPORT"

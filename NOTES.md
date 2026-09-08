@@ -1042,3 +1042,87 @@ coverage of the (horizon, staleness) space rather than independent information. 
 model on a third more rows is exactly the kind of change that is worth an hour to measure, and
 nobody has. PER_ROW=3 and PER_ROW=4 on layouts A and B, scored under the test mix, is the next
 cheap experiment.
+
+# Session 9t — the organisers' clarifications: what changes, what does not, and one urgent gap
+
+## URGENT, and nothing to do with score: emissions must be measured DURING training
+"The sustainability criterion asks for an estimate of training emissions using tools such as
+CodeCarbon, which measure consumption while training runs and cannot be applied afterwards.
+Instrument your training runs if you intend to compete for a top-10 placing."
+
+This project had `carbon_final.py`, which is called from NO pipeline, measures featsets
+(`allnoll`, `v5x_noll`) and families (cat, mlp) that the current configuration does not use, and
+re-runs training separately just to measure it -- which is exactly the after-the-fact
+reconstruction the organisers say does not count.
+
+run_models.py is now instrumented directly: CARBON=1 starts a CodeCarbon tracker around the run
+that actually produces the submitted model and writes one row per run to out/carbon/emissions.csv.
+run_night.sh exports CARBON=1 by default, so from the next run the measurement is a sum over the
+work that really happened. It can never break training -- a missing codecarbon or a platform that
+withholds power counters prints one line and continues; verified both ways, including a full run
+that trained and saved normally with codecarbon absent. carbon_report.py totals it, splits it by
+phase (validation versus FINAL) and writes out/carbon/summary.md. Verified end to end on three
+real runs.
+
+## Recursive forecasting is now explicitly permitted -- and the arithmetic says it would LOSE
+"Permitted - recursive forecasting, feeding your own prediction forward as an input to the next
+month. The restriction is on future observations, not on model output."
+
+This was the largest structurally-different idea left, so it deserved a real answer rather than an
+attempt. The decisive number is already in analyze_A:
+
+  our one-step error in the LEVEL of TWS(t+1)   0.6220
+  the direct model's overall RMSE               0.6260
+
+Recursive forecasting pays off when one-step prediction is much more accurate than multi-step.
+Here it is not more accurate AT ALL -- it is the same. And a recursive prediction at horizon k
+inherits that level error whole as its anchor, so
+
+  err_recursive(k)^2 = err_anchor^2 + err_step^2 >= 0.6220^2
+
+even with a perfect step model. Against the direct model's 0.5345 at h2 and 0.5491 at h3 -- 39% of
+the test by weight -- recursion loses before any compounding at all. The horizons where the floor
+looks favourable (h4-h6, 22% of weight) are the ones where the direct error is inflated by calendar
+month rather than by staleness: layout A's h6 is one specific June, which carries a +0.29 bias and
+an RMSE of 1.07, and feeding predictions forward does not fix June. Not built. The reasoning is
+recorded so it is not re-proposed.
+
+## Seasonal forecasts: do NOT use them, the rules contradict each other on exactly this
+A competitor asked whether GDO seasonal forecasts -- issued in month t, covering t+1 to t+6 --
+are allowed, noting the "source date <= t" language was written for reanalysis. The published
+answer lists what is permitted and prohibited and does not address forecasts, so the question is
+open. Meanwhile the two governing clauses conflict for this product and nothing else:
+
+  permitted      "external non-TWS covariates, provided every source date is at or before t"
+  prohibited     "any feature encoding month t+1 or later, from any source, remains grounds
+                  for disqualification"
+
+A forecast issued at t has source date t and ENCODES t+1. Under a top-ten code review the second
+clause is the one that gets applied, and the cost of being wrong is the placing, not a few
+thousandths. Treat as prohibited until the organisers answer that specific question in writing.
+
+## What the clarifications confirm that we already do
+- t+1 is the next calendar month for every row; horizon up to seven. Matches.
+- only TWS_t is masked; SPEI and SOIL_MOISTURE are present for every test row at its own month t.
+  Matches -- add_era5/add_ncep/add_anom already read covariates at t for every row.
+- the strictly-backward anchor is the permitted fill. That is exactly `t_known`.
+- filling a masked row with the cell's mean over observed TEST months is PROHIBITED. We have never
+  done this; compliance.py's independent reconstruction of tws_known from Train plus unmasked Test
+  rows proves it.
+- lat/lon as a lookup key is permitted, as predictive features is not. compliance.py audits the
+  used-feature list for exactly this and passes.
+- GRACE-derived products of any kind are prohibited absolutely. external/ holds NCEP reanalysis
+  and ONI only; compliance.py inventories it.
+
+## The one genuinely new opening: longer and different covariates
+The permitted list explicitly includes GDO products whose source date is <= t. Two are worth the
+remaining time and are NOT resolution refinements -- the objection that closed ERA5-Land was that
+the error does not live at fine scales, which says nothing about new VARIABLES:
+  * SPI at 9, 24 and 48 months. The feature set stops at 12. TWS includes groundwater, which
+    integrates over years, and nothing in the model sees beyond one year of accumulated deficit.
+  * fAPAR and its anomaly. Vegetation is an OBSERVATION of how much water the surface actually
+    had, integrated over weeks, and it is not derived from the same reanalysis as everything else
+    in the feature set. It is the only candidate that is independent information rather than
+    another function of P, E and R.
+The measured ceiling for the existing anomaly block is a ridge R^2 of 0.050 on the change; that is
+what a new covariate has to beat.

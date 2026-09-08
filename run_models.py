@@ -16,6 +16,28 @@ from features4 import AR
 from features5 import WIDE
 from features6 import RECENT, LONGTERM
 L,M,FS=sys.argv[1:4]; R=int(sys.argv[4]) if len(sys.argv)>4 else None; t0=time.time()
+# CARBON=1 instruments THIS training run with CodeCarbon. The sustainability criterion asks for
+# emissions measured WHILE training runs -- it cannot be reconstructed afterwards -- so the
+# measurement has to live inside the run that actually produces the submitted models, not in a
+# separate one-seed proxy. Never allowed to break training: if codecarbon is missing, or the
+# platform will not give it power counters, the run continues unmeasured.
+_TRK=None
+if os.environ.get("CARBON","0")=="1":
+    try:
+        from codecarbon import EmissionsTracker
+        os.makedirs("out/carbon",exist_ok=True)
+        _TRK=EmissionsTracker(project_name=f"{L}_{M}_{FS}{os.environ.get('TAG','')}_s{os.environ.get('SEED','0')}",
+                              output_dir="out/carbon",log_level="error",save_to_file=True)
+        _TRK.start()
+    except Exception as e:
+        print(f"  carbon: not measured ({type(e).__name__}: {e})",flush=True); _TRK=None
+def _carbon_stop():
+    if _TRK is None: return
+    try:
+        kg=_TRK.stop()
+        print(f"  carbon: {kg:.6g} kg CO2e for this run",flush=True)
+    except Exception as e:
+        print(f"  carbon: stop failed ({type(e).__name__})",flush=True)
 ALL=json.load(open("out/mats/feats.json"))
 F6=[f for f in FEATS2+AR+WIDE+RECENT if f not in LONGTERM]
 NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
@@ -172,3 +194,4 @@ json.dump({"layout":L,"model":M,"featset":FS,"tag":os.environ.get("TAG",""),"dro
            "hfilt":HFILT,"n_features":len(F),"features":F},
           open(f"out/mats/used_{L}_{M}_{FS}{os.environ.get('TAG','')}.json","w"))
 np.save(f"out/mats/pred_{L}_{M}_{FS}_s{seed}{os.environ.get('TAG','')}.npy",p); print("saved",flush=True)
+_carbon_stop()
