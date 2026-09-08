@@ -1467,3 +1467,44 @@ validation -- it is the record 2015-16 El Nino Amazon drought plus the post-GRAC
 what session 9 already observed when validation predicted -0.0128/-0.0184 and the leaderboard
 paid -0.0129. Read every candidate below as a relative change: closing 0.696 -> 0.6495 needs a
 6.6% relative gain, which is about 0.022 in validation, and e8_bigsa alone was worth 0.0265.
+
+## Four structural feature families, all rejected
+
+Run in `fastval.py` on three block placements each, mean of the three, test horizon mix:
+
+```
+base                       0.3061 0.3076 0.3119   0.3085
++mem     12/24-month lags of the cell's own anomaly, plus a 24-month anomaly trend
+                           0.3067 0.3075 0.3122   0.3088   (+0.0002)
++box     mean anomaly over 7x7 and 13x13 boxes at the anchor month
+                           0.3069 0.3080 0.3127   0.3092   (+0.0006)
++dir     the same 13x13 box split into its west and east halves
+                           0.3067 0.3079 0.3125   0.3090   (+0.0005)
++upcov   standardised soil moisture and SPEI_03 averaged over the cells to the west,
+         at the row's own month
+                           0.3065 0.3083 0.3112   0.3087   (+0.0001)
++box+mem                   0.3080 0.3076 0.3120   0.3092   (+0.0007)
+all four                   0.3079 0.3087 0.3118   0.3095   (+0.0009)
+```
+
+Every one is worse than base, by an amount consistent with pure dilution rather than harm. The
+motivations were sound and are recorded so they are not re-proposed:
+
+  * **mem** -- groundwater in the Amazon has multi-year memory, so the anomaly a year or two
+    before the anchor should carry information the anchor does not. It does not, on top of a
+    per-cell per-calendar-month climatology, which already encodes the cell's slow state.
+  * **box / dir** -- the residual is known to be large-scale and spatially coherent (variogram
+    +0.967 at lag 1), and the pipeline's isotropic smoothed anchors at 300-2500 km were the
+    single largest feature gain in the grid (e8_bigsa, -0.0265). Splitting a large box into
+    upstream and downstream halves tests whether the coherence is *directional*, since the
+    Amazon drains west to east. It is not: the west and east halves buy nothing over the
+    isotropic mean, which is a real answer about the error's geometry.
+  * **upcov** -- a cell's storage integrates rainfall over its whole upstream basin, so the
+    forcing that matters is not the forcing in the cell. Averaging the released covariates
+    upstream buys nothing either.
+
+Read together with the anomaly result from session 9, this says the missing ingredient is not a
+smarter transform of the released columns -- four independent attempts at one found nothing --
+but a forcing field the model has never seen. Which is exactly what ERA5 is (session 10a).
+Caveat: four families is suggestive of saturation, not proof of it, and all four were tested in
+the 40-feature harness rather than on top of the pipeline's 201.

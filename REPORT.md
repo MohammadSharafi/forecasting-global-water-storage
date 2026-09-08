@@ -124,6 +124,8 @@ because each one stopped effort being spent in the wrong place.
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
 | recursive forecasting (explicitly permitted) | direct **0.306 / 0.308 / 0.312** against recursive **0.372 / 0.375 / 0.387**, three independent block placements, test horizon mix (`fastval.py`) | **measured and closed.** The bound argued recursion inherits the one-step error as an anchor; the measurement agrees and is worse than the bound — h=1 is identical by construction (0.273 vs 0.273, the same model) and the chain then compounds, reaching 0.545 against 0.345 at h=7. Recursion loses by 0.066–0.076 everywhere it was tried |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
+| groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | the per-cell per-calendar-month climatology already carries the cell's slow state |
+| directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors |
 | free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
 
 One avenue was **re-opened**, not closed. `build_mats.py` loads ERA5 only when `external/era5/*.nc`
