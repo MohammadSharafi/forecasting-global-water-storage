@@ -822,3 +822,47 @@ Neither bug aborts a run: both steps are `|| true`. A run that hit them complete
 valid submissions, just WITHOUT the calibration stage and without the layout-C table. Recovery is
 free because failed steps never write a marker: `git pull` and rerun the same command. Only the
 two failed steps and the assembles repeat; every training run is skipped.
+
+# Session 9p — IT TRANSFERRED. 0.709259 -> 0.696326 on the public leaderboard
+
+`out/sub_q_main.csv`, the first submission carrying the covariate anomalies, scored
+**0.696326352** against a previous best of 0.709259.
+
+  gain                    -0.012933
+  SE of the gap           0.00046      (lb_se.py, for this exact pair of files)
+  in standard errors      28
+  vs the noise threshold  11x
+
+## The number that matters more than the gain
+Validation predicted the anomalies would be worth between -0.0128 (layout A) and -0.0184
+(layout B). The leaderboard delivered -0.0129 -- inside the predicted range, essentially 1:1
+with layout A.
+
+After session 4's re-base (+0.0069) and the climatology pull (+0.0208) both transferred
+BACKWARDS, this project had good reason to distrust its own validation, and several sessions
+were spent hedging against it. That distrust is now resolved for this class of change:
+a feature that wins on both layouts under the test horizon mix wins on the leaderboard, by
+about the amount validation says. Every remaining idea gated by xfit.py is therefore worth
+more than it was yesterday, because the gate has been shown to predict rather than merely
+to filter.
+
+It also retires the session-5 E2 conclusion for good. E2 said no legal covariate can predict
+the residual; ceiling.py showed that rested on a raw-vs-anomaly encoding artifact; the
+leaderboard has now paid out 0.0129 on exactly the features E2 said could not exist.
+
+## What this was, precisely
+The submitted file is not the anomalies alone. It is the whole session-9 stack: covariate
+anomalies, 3/6/12-month antecedent windows, the modelled-TWS composite, 1500/2500 km
+continental anchors, zonal context, the configuration select_config chose (DROPF='' / lgb /
+ramp), a fitted multi-family ensemble, tuned spatial smoothing, and 16 seeds per family --
+but NOT the per-horizon calibration, because postcalscan crashed on the Float32 horizon bug
+(fixed in 47750f7, after this run). So the calibration stage is still unspent.
+
+## Position
+0.696326 is 0.006326 above the 0.69 target the entrant set. At the measured cluster density
+of 0.00047 RMSE per rank it is worth roughly 28 places from rank 82.
+
+## What it makes urgent
+diag2_ceiling_A now decides ERA5-Land on arithmetic rather than hope: with validation shown to
+transfer, its measured headroom is a forecast of leaderboard gain, and ERA5-Land is the only
+remaining single idea large enough to close 0.0063. Read it first.
