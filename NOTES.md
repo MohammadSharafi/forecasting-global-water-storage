@@ -1126,3 +1126,34 @@ the error does not live at fine scales, which says nothing about new VARIABLES:
     another function of P, E and R.
 The measured ceiling for the existing anomaly block is a ridge R^2 of 0.050 on the change; that is
 what a new covariate has to beat.
+
+# Session 9u — REPORT.md rewritten; it described a pipeline that no longer exists
+
+The report is half the top-ten outcome and it had drifted badly out of date. It described two
+stacks of four families blended 50/50, a public score of 0.712, and feature lists of 168 and 166 --
+none of which is now true. It did not mention the covariate anomaly encoding at all, which is the
+single change that produced the entire leaderboard gain, nor layout C, nor the leave-one-layout-out
+gate, nor any of the avenues closed on evidence.
+
+Worse, its sustainability section described exactly the measurement the organisers have since said
+does not count: a separate run of `carbon_final.py` after the fact. That section now describes the
+live instrumentation in run_models.py.
+
+Rewritten around what is actually established, with seven explicit **[pending]** markers for the
+numbers the final run will produce, so nothing is invented and finishing it is a fill-in rather
+than a rewrite. New material a code reviewer will care about:
+
+  * section 4 lists the five avenues CLOSED on evidence, with the measurement that closed each. A
+    negative result honestly established is evidence of method, and this project now has five of
+    them: the global offset, the band offset, higher-resolution forcing, recursive forecasting
+    (explicitly permitted, and shown to lose on arithmetic we already had), and the hindcast.
+  * section 5 describes compliance.py auditing ARTEFACTS rather than intent -- in particular
+    recomputing clim_next from history alone and comparing it to the matrix column, which measures
+    the leakage rule rather than asserting it -- and records the deliberate abstention from GDO
+    seasonal forecasts, where the permitted and prohibited clauses conflict and the question is
+    unanswered.
+  * section 3.3 records the two post-processing stages the LEADERBOARD ruled on, in both
+    directions: smoothing kept (removing it costs 0.0028), calibration dropped (it costs 0.00036
+    despite the held-out gate adopting it).
+
+The old version is not kept as a file; it is in git history at 2f8caf6.
