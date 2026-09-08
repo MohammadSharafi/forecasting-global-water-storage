@@ -1483,3 +1483,168 @@ expensive decision the orchestrator makes. Reproduced in a fixture, fixed by shi
 function body, verified to produce `r_lgb=410 r_xgb=230` and nothing else. Not edited while the
 run was in flight: /bin/sh reads a script by byte offset as it executes, so editing a running
 shell script can corrupt it mid-run.
+# Session 10a -- ERA5 has never been in a single model
+
+Chasing the 0.6495 leaderboard cluster, the first thing checked was the cheapest: whether the
+covariates already provisioned are actually reaching the models. They are not.
+
+`build_mats.py:52` reads ERA5 only `if glob.glob("external/era5/*.nc")`, and that directory does
+not exist. Three independent confirmations:
+
+  * all four `out/night/build_*.log` print `era5: None` (and `gdo: not present`);
+  * `out/mats/feats.json` holds 201 features and not one of them starts with `e5`;
+  * the run report's external inventory lists ncep, ncep2, cpc and oni -- 15 files, no ERA5.
+
+So `features_era5.py`, `cds_download.py` and `ERA5_SETUP.md` have been dead code since session 8.
+Every leaderboard number this project has ever posted was produced without ERA5.
+
+What that costs is not a rounding error. The domain is 40x40 one-degree cells over tropical South
+America (lat -19.5..19.5, lon -79.5..-40.5) -- the Amazon, the eastern Andes and the Nordeste.
+Against that grid:
+
+  * NCEP-R1/R2 is ~1.9-2.5 degrees, so a single reanalysis cell covers four to six target cells,
+    and it carries latent heat flux rather than evaporation;
+  * ERA5 is one degree and lands on the target grid exactly, and carries evaporation, runoff and
+    a four-layer soil column (0-7, 7-28, 28-100, 100-289 cm) directly;
+  * the family that produced the entire session-9 leaderboard gain was the per-cell standardised
+    anomalies of exactly these fields. `features_anom.build` is already called for ERA5 at
+    `build_mats.py:79`; it has simply always received `None`.
+
+Two guards were wrong in a way that would have hidden the fix as well:
+
+  * `src_guard build_` fingerprinted the feature SOURCE files only. Downloading ERA5 changes no
+    source file, so the cached `A_tr.parquet` would have been reused and the new data would never
+    have reached a model. The external files are now fingerprinted too (`$S/extinv.txt`, name and
+    byte count of every .nc/.parquet/.data under external/), so arriving data invalidates the
+    matrices exactly as edited code does.
+  * `run_tonight.sh` had no ERA5 step at all. T0 now downloads it when `~/.cdsapirc` exists,
+    and otherwise says plainly that it is absent and points at ERA5_SETUP.md, without failing
+    the run.
+
+Note for whoever adds variables later: snow is dead weight in this domain. `e5SWE` (from `sd`) and
+NCEP's `weasd` are ~zero over a box that stops at 19.5N, so they cost features and buy nothing
+outside a few Andean cells. The four `swvl` layers are currently collapsed into one `SW` column by
+a fixed-thickness weighted sum; the profile shape (fast top layer against slow bottom layer) is
+thrown away and is worth carrying separately once ERA5 is actually present.
+
+## Recursive forecasting: measured, and it loses
+
+`recursive.py` needs build_mats and therefore the external archives, so it had never been run.
+`fastval.py` rebuilds the same framing from Train.csv alone and settles it in a minute:
+
+```
+placement          direct   recursive   delta
+2010-08            0.3061     0.3716    +0.0655
+2012-02            0.3076     0.3749    +0.0673
+2013-08            0.3119     0.3874    +0.0755
+
+per-horizon (2013-08)   h1     h2     h3     h4     h5     h6     h7
+  direct               0.274  0.323  0.325  0.326  0.329  0.355  0.345
+  recursive            0.270  0.358  0.413  0.463  0.484  0.531  0.544
+```
+
+h=1 is the same model in both columns, so the two agree there and the gap is pure compounding.
+The bound in REPORT.md §4 said recursion inherits the one-step error as an anchor; the
+measurement is worse than the bound. Closed.
+
+Two calibration points fall out of the same harness, and they matter for reading every future
+number. Under the test's horizon mix, on the real data:
+
+  * persistence (last observed TWS) scores **1.166** -- at h>=2 it is worse than predicting
+    nothing, because a stale anchor is anticorrelated with a standardised anomaly seven months
+    later. The starter notebook calls it "a very strong baseline"; in this framing it is the
+    weakest thing available.
+  * per-cell per-calendar-month climatology scores **0.502**, and climatology plus the anchor's
+    anomaly ("anomaly persistence") scores **0.407** -- three lines of arithmetic, no model.
+  * the full pipeline scores **0.334** on layout A, and this 40-feature harness scores 0.306.
+
+So validation sits near 0.31-0.33 while the leaderboard sits at 0.696 and its leader at 0.6495:
+the ratio is about 2.1. The test window is genuinely harder than any window available for
+validation -- it is the record 2015-16 El Nino Amazon drought plus the post-GRACE-gap months of
+2018 -- and that is a level shift, not a broken pipeline. What transfers is the RATIO, which is
+what session 9 already observed when validation predicted -0.0128/-0.0184 and the leaderboard
+paid -0.0129. Read every candidate below as a relative change: closing 0.696 -> 0.6495 needs a
+6.6% relative gain, which is about 0.022 in validation, and e8_bigsa alone was worth 0.0265.
+
+## Four structural feature families, all rejected
+
+Run in `fastval.py` on three block placements each, mean of the three, test horizon mix:
+
+```
+base                       0.3061 0.3076 0.3119   0.3085
++mem     12/24-month lags of the cell's own anomaly, plus a 24-month anomaly trend
+                           0.3067 0.3075 0.3122   0.3088   (+0.0002)
++box     mean anomaly over 7x7 and 13x13 boxes at the anchor month
+                           0.3069 0.3080 0.3127   0.3092   (+0.0006)
++dir     the same 13x13 box split into its west and east halves
+                           0.3067 0.3079 0.3125   0.3090   (+0.0005)
++upcov   standardised soil moisture and SPEI_03 averaged over the cells to the west,
+         at the row's own month
+                           0.3065 0.3083 0.3112   0.3087   (+0.0001)
++box+mem                   0.3080 0.3076 0.3120   0.3092   (+0.0007)
+all four                   0.3079 0.3087 0.3118   0.3095   (+0.0009)
+```
+
+Every one is worse than base, by an amount consistent with pure dilution rather than harm. The
+motivations were sound and are recorded so they are not re-proposed:
+
+  * **mem** -- groundwater in the Amazon has multi-year memory, so the anomaly a year or two
+    before the anchor should carry information the anchor does not. It does not, on top of a
+    per-cell per-calendar-month climatology, which already encodes the cell's slow state.
+  * **box / dir** -- the residual is known to be large-scale and spatially coherent (variogram
+    +0.967 at lag 1), and the pipeline's isotropic smoothed anchors at 300-2500 km were the
+    single largest feature gain in the grid (e8_bigsa, -0.0265). Splitting a large box into
+    upstream and downstream halves tests whether the coherence is *directional*, since the
+    Amazon drains west to east. It is not: the west and east halves buy nothing over the
+    isotropic mean, which is a real answer about the error's geometry.
+  * **upcov** -- a cell's storage integrates rainfall over its whole upstream basin, so the
+    forcing that matters is not the forcing in the cell. Averaging the released covariates
+    upstream buys nothing either.
+
+Read together with the anomaly result from session 9, this says the missing ingredient is not a
+smarter transform of the released columns -- four independent attempts at one found nothing --
+but a forcing field the model has never seen. Which is exactly what ERA5 is (session 10a).
+Caveat: four families is suggestive of saturation, not proof of it, and all four were tested in
+the 40-feature harness rather than on top of the pipeline's 201.
+
+# Session 10b — the ERA5 contradiction, resolved the way this project resolves things
+
+Session 10a and session 10 ran in parallel on different machines and reached opposite conclusions
+about the same question, which is worth resolving in writing rather than letting the next reader
+find two contradictory sections.
+
+10a: "ERA5 has never been in a single model. `external/era5` does not exist, all four build logs
+print `era5: None`, feats.json holds 201 features and none starts with `e5`."
+
+That is true of the container it was written on. It is false of the machine that produces the
+submissions, and the artefacts settle it — not a reading of the code, which is exactly the
+distinction 10a's own last paragraph draws:
+
+    external/era5/                       19 files, downloaded 09-05 07:31-07:48
+    out/night/build_{A,B,C,FINAL}.log    era5: (14774400, 10)   -- all four
+    out/mats/feats.json                  266 features, 65 of them ERA5
+    out/mats/used_FINAL_*.json           n=261, e5=21, an_e5=44  -- every tag trained tonight
+    out/night/compliance.log             lists the 19 ERA5 files in the external inventory
+
+`used_*.json` is written by run_models.py per run for precisely this purpose: it records what a
+model was actually given, so no one has to infer it from a glob and a log from another day. Every
+FINAL model behind tonight's submissions carries 21 raw ERA5 features and 44 ERA5 anomaly features.
+
+Nothing in 10a is wasted. Its two guards are real fixes and are merged: `src_guard build_` now
+fingerprints the external archives as well as the source files -- downloading data changes no .py
+file, so without it an arriving covariate would have been silently ignored by every cached matrix
+-- and `run_tonight.sh` grows a T0 that downloads ERA5 when `~/.cdsapirc` exists. Both would have
+mattered on this machine too, four days ago.
+
+## The box download is redundant here, and should not be moved into external/era5
+
+`~/era5_dl` holds 19 box-cut files (24.5N/-84.5W/-24.5S/-35.5E). `external/era5` already holds 19
+global files covering the same box, and those are what every current matrix was built from.
+`load_era5` globs the directory, concatenates and then `.unique(["lat","lon","time"])`, so mixing
+the two sets would not duplicate rows -- but it would make which file supplied a cell-month
+arbitrary, and it would change `extinv.txt`, invalidating every cached matrix and forcing a full
+rebuild and retrain for no gain: the two products are the same fields on the same grid.
+
+Leave them where they are. The box cut is the right request for a machine that has to download
+ERA5 fresh (a twentieth of the bytes), and it is what `cds_download.py` now asks for; it is not a
+reason to disturb data that is already on disk and already in the models.

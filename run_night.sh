@@ -110,7 +110,12 @@ step diag_shift_B   "$PY globalshift.py B lgb_v5x_noll" || true
 # Everything a step's result depends on, so a rewritten script can never be skipped again.
 src_guard val_C      validation_c.py
 printf 'PER_ROW=%s' "${PER_ROW:-2}" > "$S/perrow.txt"   # a different PER_ROW is a different matrix
-src_guard build_     "$S/perrow.txt" build_mats.py features.py features2.py features4.py features5.py features6.py \
+# The external covariates are an input to the matrix exactly as the feature code is. Downloading
+# ERA5 or GDO changes no source file, so without this the cached matrices would be reused and the
+# new data would silently never reach a model.
+find external -type f \( -name '*.nc' -o -name '*.parquet' -o -name '*.data' \) \
+     -exec wc -c {} \; 2>/dev/null | sort > "$S/extinv.txt"
+src_guard build_     "$S/extinv.txt" "$S/perrow.txt" build_mats.py features.py features2.py features4.py features5.py features6.py \
                      features_ncep.py features_era5.py features_x.py features_anom.py \
                      features_scale.py features_gdo.py
 src_guard anchor_    add_anchor_feats.py anchor.py

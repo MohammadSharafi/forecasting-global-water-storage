@@ -122,8 +122,27 @@ because each one stopped effort being spent in the wrong place.
 | global monthly offset correction | 2.9% of MSE, oracle −0.0090, persistence corr **−0.110** | temporally white; unreachable |
 | per-latitude-band offset | 12.9% of MSE, oracle **−0.0418**, persistence corr +0.190 | every correction weight tried made it worse; a linear predictor with r=0.19 can remove only r² of it, ≤0.0015 in sample |
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
-| recursive forecasting (explicitly permitted) | chained one-step forecasts against the direct model, all three layouts | **measured, and it loses**: worse at 21 of 21 (layout, horizon) cells, and by more as the horizon grows. Test-mix RMSE direct/recursive: A 0.6383/0.6657, B 0.5356/0.5909, C 0.5315/0.5692; a free 50/50 blend also loses everywhere. The cause is the one the bound predicted — the h=1 model is no better than the direct model at h=1 (0.6232 vs 0.6238 on A), so recursion pays that error as an anchor and then compounds it. `recursive.py A|B|C` |
+| recursive forecasting (explicitly permitted) | two independent measurements: `fastval.py` over three block placements, and `recursive.py` chaining through the full pipeline's own feature builder on layouts A, B and C | **measured and closed, twice.** fastval: direct **0.306 / 0.308 / 0.312** against recursive **0.372 / 0.375 / 0.387**. Full pipeline, test-mix RMSE direct/recursive: A 0.6383/0.6657, B 0.5356/0.5909, C 0.5315/0.5692 — worse at 21 of 21 (layout, horizon) cells, and by more as the horizon grows, which is the opposite of the only shape that would have justified building it out. A free 50/50 blend also loses everywhere. The cause is the one the bound predicted: the one-step model is no better than the direct model at h=1 (0.6232 vs 0.6238 on A), so recursion pays that error as an anchor and then compounds it |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
+| groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | the per-cell per-calendar-month climatology already carries the cell's slow state |
+| directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors |
+| free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
+
+One avenue was **re-opened** and then closed by checking the artefacts rather than the code.
+A session working on a container without the data found `build_mats.py` loading ERA5 only when
+`external/era5/*.nc` exists, saw `era5: None` in the build logs it had, and concluded that ERA5 had
+never reached a model. On the machine that produces the submissions the opposite is true, and three
+artefacts say so: all four `out/night/build_*.log` print `era5: (14774400, 10)`; the compliance
+audit's external inventory lists 19 ERA5 files; and every `out/mats/used_FINAL_*.json` from tonight
+records **21 raw ERA5 features and 44 ERA5 anomaly features** out of 261. ERA5 at 1° — matching the
+target grid, with a real evaporation field and a four-layer soil column — is in the models that made
+these files, feeding the per-cell standardised anomaly family of §3.1. The ERA5-**Land** row above
+closed a 0.1° product on the finding that the error is large-scale; it never spoke to ERA5 at 1°,
+which is a matched-resolution replacement for a coarser one rather than a finer one.
+
+The disagreement is itself worth recording, because it is this project's recurring failure mode in
+a new costume: a conclusion drawn from reading code and a stale log rather than from the artefact
+the run actually wrote. `run_models.py` writes `used_*.json` per run for exactly this reason.
 
 Together these say something specific about the remaining error: it is **large-scale, spatially
 coherent, and temporally white**. Smoothing can only shave it — which is exactly what the

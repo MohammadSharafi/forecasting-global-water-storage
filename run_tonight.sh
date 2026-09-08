@@ -31,6 +31,25 @@ done_() { [ -f "$S/$1.done" ]; }
 : > "$R"
 head1 "TONIGHT   branch $(git rev-parse --abbrev-ref HEAD 2>/dev/null)  commit $(git rev-parse --short HEAD 2>/dev/null)"
 
+# ---------------------------------------------------------------- T0  the missing covariate
+head1 "T0  ERA5 -- wired into build_mats since session 8, never actually downloaded"
+# The run report's external inventory lists ncep, ncep2, cpc and oni and nothing else, and
+# build_mats reads ERA5 only `if glob.glob("external/era5/*.nc")`. Every ERA5 feature has
+# therefore been absent from every model this project has trained. NCEP-R1/R2 is ~2 degrees
+# and carries no evaporation; ERA5 is 1 degree, matches the target grid exactly, and adds
+# evaporation and a four-layer soil column -- and it is the per-cell standardised anomalies
+# of exactly this kind of field that produced the whole leaderboard gain in session 9.
+if [ -n "$(ls external/era5/*.nc 2>/dev/null)" ]; then
+  say "  ERA5 present: $(ls external/era5/*.nc | wc -l | tr -d ' ') files"
+elif [ -f "$HOME/.cdsapirc" ]; then
+  step era5 "$PY cds_download.py" && say "  ERA5 downloaded" \
+    || say "  ERA5 download failed -- see $S/era5.log; the run continues without it"
+else
+  say "  ERA5 ABSENT and ~/.cdsapirc is missing, so tonight's run cannot use it."
+  say "  Five minutes of setup buys it for every future run: see ERA5_SETUP.md."
+  say "  The run continues on ncep/ncep2/cpc, exactly as before."
+fi
+
 # ---------------------------------------------------------------- T1  free candidates
 head1 "T1  blends of the files you already have (no training)"
 # stack.py fitted the 31-leaf model's weight to 0.000 on validation, and the leaderboard says that
