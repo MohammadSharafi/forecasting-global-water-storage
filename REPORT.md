@@ -122,8 +122,18 @@ because each one stopped effort being spent in the wrong place.
 | global monthly offset correction | 2.9% of MSE, oracle −0.0090, persistence corr **−0.110** | temporally white; unreachable |
 | per-latitude-band offset | 12.9% of MSE, oracle **−0.0418**, persistence corr +0.190 | every correction weight tried made it worse; a linear predictor with r=0.19 can remove only r² of it, ≤0.0015 in sample |
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
-| recursive forecasting (explicitly permitted) | one-step error in the level 0.6220 vs direct overall RMSE 0.6260 | one-step prediction is no more accurate than multi-step, so recursion inherits its full error as an anchor — a floor of 0.6220 against direct 0.5345 at h2 and 0.5491 at h3, 39% of the test by weight. This is a **bound**, not a measurement: `recursive.py` implements the chained forecast and reports direct-versus-recursive RMSE per horizon, and settles it empirically. **[pending]** |
+| recursive forecasting (explicitly permitted) | direct **0.306 / 0.308 / 0.312** against recursive **0.372 / 0.375 / 0.387**, three independent block placements, test horizon mix (`fastval.py`) | **measured and closed.** The bound argued recursion inherits the one-step error as an anchor; the measurement agrees and is worse than the bound — h=1 is identical by construction (0.273 vs 0.273, the same model) and the chain then compounds, reaching 0.545 against 0.345 at h=7. Recursion loses by 0.066–0.076 everywhere it was tried |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
+| free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
+
+One avenue was **re-opened**, not closed. `build_mats.py` loads ERA5 only when `external/era5/*.nc`
+exists, and it never has: all four `out/night/build_*.log` print `era5: None`, and none of the 201
+features in `out/mats/feats.json` begins with `e5`. Every result in this report was produced on
+NCEP-R1/R2 at ~2°, against a 1° target grid, with no evaporation field and a two-layer soil column.
+The "higher-resolution forcing" row above closed ERA5-**Land** at 0.1°, on the finding that the
+error is large-scale — it says nothing about ERA5 at 1°, which is a *matched*-resolution
+replacement for a coarser product rather than a finer one, and which feeds the per-cell
+standardised anomaly family that produced the entire session-9 gain (§3.1).
 
 Together these say something specific about the remaining error: it is **large-scale, spatially
 coherent, and temporally white**. Smoothing can only shave it — which is exactly what the

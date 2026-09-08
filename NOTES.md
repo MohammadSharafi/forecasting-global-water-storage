@@ -1428,3 +1428,42 @@ NCEP's `weasd` are ~zero over a box that stops at 19.5N, so they cost features a
 outside a few Andean cells. The four `swvl` layers are currently collapsed into one `SW` column by
 a fixed-thickness weighted sum; the profile shape (fast top layer against slow bottom layer) is
 thrown away and is worth carrying separately once ERA5 is actually present.
+
+## Recursive forecasting: measured, and it loses
+
+`recursive.py` needs build_mats and therefore the external archives, so it had never been run.
+`fastval.py` rebuilds the same framing from Train.csv alone and settles it in a minute:
+
+```
+placement          direct   recursive   delta
+2010-08            0.3061     0.3716    +0.0655
+2012-02            0.3076     0.3749    +0.0673
+2013-08            0.3119     0.3874    +0.0755
+
+per-horizon (2013-08)   h1     h2     h3     h4     h5     h6     h7
+  direct               0.274  0.323  0.325  0.326  0.329  0.355  0.345
+  recursive            0.270  0.358  0.413  0.463  0.484  0.531  0.544
+```
+
+h=1 is the same model in both columns, so the two agree there and the gap is pure compounding.
+The bound in REPORT.md §4 said recursion inherits the one-step error as an anchor; the
+measurement is worse than the bound. Closed.
+
+Two calibration points fall out of the same harness, and they matter for reading every future
+number. Under the test's horizon mix, on the real data:
+
+  * persistence (last observed TWS) scores **1.166** -- at h>=2 it is worse than predicting
+    nothing, because a stale anchor is anticorrelated with a standardised anomaly seven months
+    later. The starter notebook calls it "a very strong baseline"; in this framing it is the
+    weakest thing available.
+  * per-cell per-calendar-month climatology scores **0.502**, and climatology plus the anchor's
+    anomaly ("anomaly persistence") scores **0.407** -- three lines of arithmetic, no model.
+  * the full pipeline scores **0.334** on layout A, and this 40-feature harness scores 0.306.
+
+So validation sits near 0.31-0.33 while the leaderboard sits at 0.696 and its leader at 0.6495:
+the ratio is about 2.1. The test window is genuinely harder than any window available for
+validation -- it is the record 2015-16 El Nino Amazon drought plus the post-GRACE-gap months of
+2018 -- and that is a level shift, not a broken pipeline. What transfers is the RATIO, which is
+what session 9 already observed when validation predicted -0.0128/-0.0184 and the leaderboard
+paid -0.0129. Read every candidate below as a relative change: closing 0.696 -> 0.6495 needs a
+6.6% relative gain, which is about 0.022 in validation, and e8_bigsa alone was worth 0.0265.
