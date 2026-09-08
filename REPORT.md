@@ -3,9 +3,11 @@
 **Entrant:** mrSharafi · **Task:** predict GRACE Total Water Storage (TWS) at month t+1 for 15,715
 one-degree land cells when the current-month TWS is hidden for two-thirds of test rows.
 
-> Numbers marked **[pending]** are filled from the final run before submission. Every other number
-> in this report is either a public-leaderboard result or a validation measurement produced by a
-> named script in this repository, and each is reproducible with the command given in §7.
+> Every number in this report is either a public-leaderboard result or a validation measurement
+> produced by a named script in this repository, and each is reproducible with the command given in
+> §7. The one figure not yet available is the final submission's own leaderboard score, marked
+> *awaiting score* in §8: the day's submission allowance was spent before the run that produced
+> that file finished.
 
 ## 1. Problem structure
 
@@ -92,7 +94,13 @@ Each model predicts the **residual** `TWS(t+1) − TWS(last observed)`. The ense
 rather than assumed: `stack.py` solves a non-negative least squares over every trained family
 (LightGBM at three capacities, XGBoost, CatBoost) on test-mix-weighted rows, renormalised to sum to
 one so that overall scale remains a separate decision, and shrunk halfway toward the incumbent
-blend. Configuration and weights: **[pending]**.
+blend. The chosen configuration is `DROPF=bigsa` — 261 features, the large-radius smoothed
+anchors dropped and the zonal features kept — trained with recency (`ramp`) sample weights and the
+test's own horizon mix, 16 seeds each of LightGBM and XGBoost at 410 and 230 rounds. Those round
+counts are `rounds.py`'s correction for FINAL training on 138 history months against layout A's 111,
+which is where its early-stopped count came from. The stack's own refit (lgb 0.39 / xgb 0.43 /
+lgbm 0.19) was **rejected**: leave-one-layout-out gave +0.00005, +0.00084 and −0.00028, so the
+incumbent **lgb 0.500 / xgb 0.500** stands.
 
 Post-processing is applied in the order it was fitted, and every stage is off unless its own
 held-out scan adopted it:
@@ -101,8 +109,8 @@ held-out scan adopted it:
 |---|---|---|
 | spatial smoothing of the residual field | `smooth_scan.py` | **kept** — the leaderboard says removing it costs 0.0028 |
 | per-horizon calibration of the change | `postcal.py` | **rejected** — held-out validation adopted it; the leaderboard says it costs 0.00036 |
-| per-calendar-month bias | `seasonal.py` | **[pending]** |
-| horizon-1 specialist | `hsplice.py` | **[pending]** |
+| per-calendar-month bias | `seasonal.py` | **rejected** — no shrinkage clears the threshold on every held-out layout; the gentlest, λ=0.25, scores +0.00074 / −0.00010 / +0.00142 |
+| horizon-1 specialist | `hsplice.py` | **kept** at β=0.50 — held out, −0.00046 / −0.00060 / −0.00031, the only stage adopted this run |
 
 Inputs, all available at or before month t: the last observed TWS with its lags, trends and per-cell
 statistics; **great-circle smoothed anchors** at 300/500/800/1500/2500 km, with the longitude window
@@ -122,10 +130,10 @@ because each one stopped effort being spent in the wrong place.
 | global monthly offset correction | 2.9% of MSE, oracle −0.0090, persistence corr **−0.110** | temporally white; unreachable |
 | per-latitude-band offset | 12.9% of MSE, oracle **−0.0418**, persistence corr +0.190 | every correction weight tried made it worse; a linear predictor with r=0.19 can remove only r² of it, ≤0.0015 in sample |
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
-| recursive forecasting (explicitly permitted) | two independent measurements: `fastval.py` over three block placements, and `recursive.py` chaining through the full pipeline's own feature builder on layouts A, B and C | **measured and closed, twice.** fastval: direct **0.306 / 0.308 / 0.312** against recursive **0.372 / 0.375 / 0.387**. Full pipeline, test-mix RMSE direct/recursive: A 0.6383/0.6657, B 0.5356/0.5909, C 0.5315/0.5692 — worse at 21 of 21 (layout, horizon) cells, and by more as the horizon grows, which is the opposite of the only shape that would have justified building it out. A free 50/50 blend also loses everywhere. The cause is the one the bound predicted: the one-step model is no better than the direct model at h=1 (0.6232 vs 0.6238 on A), so recursion pays that error as an anchor and then compounds it |
+| recursive forecasting (explicitly permitted) | chained one-step forecasts against the direct model on layouts A, B and C, through the pipeline's own feature builder (`recursive.py`) | **measured and closed.** Test-mix RMSE direct/recursive: A 0.6383/0.6657, B 0.5356/0.5909, C 0.5315/0.5692 — worse at 21 of 21 (layout, horizon) cells, and by more as the horizon grows, which is the opposite of the only shape that would have justified building it out. A free 50/50 blend also loses everywhere. The cause is the one the bound predicted: the one-step model is no better than the direct model at h=1 (0.6232 vs 0.6238 on A), so recursion pays that error as an anchor and then compounds it |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
-| groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | the per-cell per-calendar-month climatology already carries the cell's slow state |
-| directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors |
+| groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | no gain: the per-cell per-calendar-month climatology already carries the cell's slow state. Indicative rather than settled — see the note below on the placements these used |
+| directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | no gain: the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors. Same caveat as the row above |
 | free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
 
 One avenue was **re-opened** and then closed by checking the artefacts rather than the code.
@@ -143,6 +151,19 @@ which is a matched-resolution replacement for a coarser one rather than a finer 
 The disagreement is itself worth recording, because it is this project's recurring failure mode in
 a new costume: a conclusion drawn from reading code and a stale log rather than from the artefact
 the run actually wrote. `run_models.py` writes `used_*.json` per run for exactly this reason.
+
+The same session's fast harness needs one more correction, for the same reason. `fastval.py` counts
+horizons in **index steps** of the months present in `Train.csv`, and GRACE is missing 12 months of
+that record. Its three default placements do not survive on this data: two straddle gaps — a block
+laid there asks for a two- or three-month lead while labelling it h=1 — and the third runs 12 months
+past the end of the record. Nothing produced from them reproduces here: on this Train.csv the
+harness scores persistence at 0.711 and climatology at 1.019, not the 1.166 and 0.502 that were
+recorded, and the record is 149 months from 2002-05 rather than the gap-free 161 those numbers
+imply. `fastval.py` now refuses a placement the record cannot carry gap-free and prints the ones it
+can (starts 12–77, 2003-08…2009-01), exactly as `validation_c.py` does for layout C — which had this
+identical bug, and whose repair changed which configuration the pipeline chose. The two rejected
+feature families above were measured on the old placements; they are recorded as unpromising rather
+than as settled, and the recursion row rests on `recursive.py`'s full-pipeline measurement alone.
 
 Together these say something specific about the remaining error: it is **large-scale, spatially
 coherent, and temporally white**. Smoothing can only shave it — which is exactly what the
@@ -193,7 +214,13 @@ smoothed anchors rank above the cell's own recent TWS. And a cell's departure fr
 is largely observation noise — GRACE's effective resolution is coarser than the 1° grid — which is
 why smoothing the predicted residual field helps at all, and why it can only help a little: the
 residual correlation with the neighbouring cell is 0.967, so a neighbour's error is very nearly the
-same error. Detail: **[pending]** SHAP rankings from the final configuration.
+same error. The chosen configuration's own gain ranking on layout A says both things
+outright — anomaly persistence 9.4%, the six-month SPEI change over the unobserved window 7.8%, the
+**ERA5 precipitation anomaly** `an_e5Pz_w3` 5.6%, the 24-month deviation 5.6%, the anchor's own
+anomaly 5.1%, and the raw last observation `tws_known` only 4.0%, behind four regional-drought
+terms. This is a gain ranking from the models that made the submission rather than a SHAP run on a
+separate fit, which is the stronger evidence for the claim being made: it is what the submitted
+models used.
 
 ### 6.3 Approach reusability
 The pipeline is variable-agnostic: any gridded monthly target with gaps, plus any covariate set. The
@@ -210,7 +237,10 @@ persistence.
 Emissions are measured **during** the runs that produce the submitted models, not reconstructed
 afterwards: `run_models.py` starts a CodeCarbon tracker around each training run and writes one row
 per run, and `carbon_report.py` totals them and splits validation from final training
-(`out/carbon/summary.md`). Totals: **[pending]**. The instrumentation cannot break a training run —
+(`out/carbon/summary.md`). Totals for the run behind this submission: **0.1675 kg CO₂e** over
+**185 measured training runs**, 8.48 hours of training and 0.3628 kWh — 176 FINAL runs (8.11 h,
+0.1602 kg) and 9 validation runs (0.37 h, 0.0072 kg), a mean of 0.91 g CO₂e per run. Runs skipped
+because a checkpoint already existed are not counted, so this is the cost of work actually done. The instrumentation cannot break a training run —
 a missing dependency or a platform that withholds power counters prints one line and continues.
 Efficiency: features are built once and cached as float32 and every model trains from that cache;
 trees use 63-bin histograms; the orchestrator checkpoints every step so an interrupted run resumes
@@ -244,4 +274,4 @@ docstring.
 | starting point of this work | 0.709259 |
 | covariate anomalies + the session's feature work | 0.696326 |
 | smoothing kept, calibration dropped | **0.695965** |
-| final submission | **[pending]** |
+| final submission (`out/sub_q_main.csv`: 261 features, corrected round counts, β=0.50 horizon-1 splice) | **awaiting score** |

@@ -103,6 +103,17 @@ tail -40 "$S/night.log" >> "$R" 2>/dev/null
 
 # ---------------------------------------------------------------- T5  what to submit
 head1 "T5  candidates for tomorrow, best evidence first"
+# T1 blended the files that existed BEFORE T4 ran, and phase 9 of run_night.sh rewrites
+# sub_q_main.csv, sub_q_alt.csv and sub_q_base.csv from the models it just trained. So the T1
+# blends are stale by construction whenever T4 did anything, and they have to be remade from the
+# files T4 actually produced -- otherwise T5 lists a blend of a submission that no longer exists.
+if done_ night && [ -f out/sub_q_main.csv ] && [ -f out/sub_q_alt.csv ]; then
+  say "  remaking the blends from the files T4 produced (T1 blended the previous ones)"
+  rm -f "$S/blend73.done" "$S/blend55.done"
+  step blend73 "$PY blend_subs.py out/sub_blend73.csv out/sub_q_main.csv:0.7 out/sub_q_alt.csv:0.3" || true
+  step blend55 "$PY blend_subs.py out/sub_blend55.csv out/sub_q_main.csv:0.5 out/sub_q_alt.csv:0.5" || true
+  done_ blend73 && cat "$S/blend73.log" >> "$R"
+fi
 say ""
 say "  file                        what it is"
 for f in out/sub_q_main.csv "the pipeline's answer with tonight's decisions" \

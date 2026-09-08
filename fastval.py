@@ -22,15 +22,25 @@ model by about 0.005. TWS inside the window is visible only at the anchor months
 Test.csv exposes it, so `tws_prev` at an anchor is unavailable here as it is there. Covariates
 ARE readable at every month up to t, because Test.csv provides them for masked rows too.
 
-usage:  python fastval.py [start ...]      start = column index of the first block
+A placement must be gap-free: GRACE is missing 12 months of this record, and this harness
+counts horizons in index steps, so a block laid across a gap asks for a multi-month lead while
+labelling it h=1. `check()` refuses such a placement and prints the ones the record can carry.
+On this Train.csv those are starts 12..77, i.e. 2003-08..2009-01.
+
+usage:  ANCHOR=tws,ap RECUR=0 python fastval.py [start ...]
+        start = column index of the first block; ANCHOR names the residual anchors to compare
 """
-import sys, datetime as dt
+import os, sys, datetime as dt
 import numpy as np, polars as pl, lightgbm as lgb
 
 SPEI = ["SPEI_01_t", "SPEI_03_t", "SPEI_06_t", "SPEI_12_t"]
 COV = SPEI + ["SOIL_MOISTURE_t"]
 MIX = np.array([6, 4, 3, 2, 1, 1, 1], float); MIX /= MIX.sum()
 USE = set()
+# ANCHOR names the residual anchors to compare; the first is the incumbent and the
+# one every other number in this harness was produced with.
+ANCHORS = os.environ.get("ANCHOR", "tws").split(",")
+RECUR = os.environ.get("RECUR", "1") == "1"
 
 
 def addm(d, n):
@@ -61,6 +71,21 @@ C = np.full((NC, NM, len(COV)), np.nan)
 for row in cov.iter_rows():
     C[CID[(row[0], row[1])], IDX[row[2]]] = row[3:]
 MOY = np.array([m.month for m in MON])
+# GRACE has real gaps, and every index step in this harness is treated as one calendar month:
+# `horizon = ti - ki + 1`, the covariate window accumulates over `ki+1 .. ti`, and the answer is
+# T[:, ti+1]. Where a month is missing from the record those are not the same thing, and a block
+# laid across a gap quietly asks for a two- or three-month lead while calling it h=1. Layout C in
+# the main pipeline had exactly this bug and it produced a validation layout that voted for the
+# wrong configuration -- so placements here are required to be gap-free, the same way
+# validation_c.py searches for a placement the record can carry.
+MSER = np.array([m.year * 12 + m.month - 1 for m in MON])
+CONT = np.zeros(NM, bool); CONT[:-1] = np.diff(MSER) == 1
+_PRE = np.concatenate([[0], np.cumsum(CONT)])
+
+
+def contiguous(a, b):
+    """True when MON[a..b] are consecutive calendar months."""
+    return b < NM and _PRE[b] - _PRE[a] == b - a
 
 # per-cell, per-calendar-month climatology of TWS and of each covariate
 def clim(A, use):
@@ -216,6 +241,23 @@ def feats(cells, ti, ki, Tsrc):
     return X, names
 
 
+# ---------------------------------------------------------------- the residual anchor
+# Each model predicts target - anchor and the anchor is added back. `tws` is the incumbent: the
+# last observed TWS. It is a poor anchor under the test's horizon mix -- two thirds of rows are
+# two or more months stale, and a stale level is a weak predictor of a standardised anomaly seven
+# months later -- so the model spends capacity undoing it. `ap` anchors on anomaly persistence
+# instead: carry the anchor month's departure from its own climatology forward to the target
+# month's climatology. Both anchors are built from columns the model already has as features
+# (tws_k, clim_k, clim_n), so this changes what the model must learn, not what it may see.
+def anchor_of(kind, cells, ki, mn, Tsrc):
+    k = Tsrc[cells, ki]
+    if kind == "tws":
+        return k
+    if kind == "ap":
+        return TMU[cells, mn - 1] + (k - TMU[cells, MOY[ki] - 1])
+    raise SystemExit(f"unknown anchor {kind!r}")
+
+
 # ---------------------------------------------------------------- experiment
 BLOCKS = [1, 3, 4, 7, 1, 2]          # chain lengths the test actually uses
 PAR = dict(objective="l2", learning_rate=0.05, num_leaves=63, min_data_in_leaf=40,
@@ -241,6 +283,29 @@ def place(start):
     return out, a
 
 
+SPAN = sum(BLOCKS) + len(BLOCKS)          # place() reaches start+SPAN; targets need start+SPAN-1
+
+
+def valid_starts():
+    return [s for s in range(2, NM - SPAN - 1) if contiguous(s, s + SPAN)]
+
+
+def check(start):
+    """Refuse a placement the record cannot carry gap-free, and say which it can."""
+    if start + SPAN >= NM:
+        v = valid_starts()
+        raise SystemExit(f"start={start}: the window reaches index {start + SPAN}, past the end of "
+                         f"the record ({NM - 1}). Gap-free starts: {v[0]}..{v[-1]}")
+    if not contiguous(start, start + SPAN):
+        miss = SPAN - (_PRE[start + SPAN] - _PRE[start])
+        v = valid_starts()
+        raise SystemExit(
+            f"start={start} ({MON[start]}..{MON[start + SPAN]}): {miss} calendar month(s) are "
+            f"missing inside the window, so a block laid here would ask for multi-month leads "
+            f"while calling them h=1. Gap-free starts on this record: {v[0]}..{v[-1]} "
+            f"({MON[v[0]]}..{MON[v[-1]]}).")
+
+
 def mixed(y, p, h):
     mse = np.array([np.mean((y[h == i] - p[h == i]) ** 2) if (h == i).any() else np.nan
                     for i in range(1, 8)])
@@ -250,6 +315,7 @@ def mixed(y, p, h):
 
 def run(start):
     global TMU, TSD, CMU, CSD
+    check(start)
     anch, end = place(start)
     va_c, va_t, va_k = rows_for(anch)
     lo, hi = anch[0][0], end                      # validation window, inclusive of targets
@@ -269,10 +335,20 @@ def run(start):
             cs.append(np.arange(NC)); ts.append(np.full(NC, t)); ks.append(np.full(NC, a))
     tr_c, tr_t, tr_k = np.concatenate(cs), np.concatenate(ts), np.concatenate(ks)
 
+    # a training row is only usable where its own (k .. t+1) span is gap-free, for the same
+    # reason the placement must be: otherwise its horizon label and its covariate window are
+    # measured in index steps that are not months
+    good = np.array([contiguous(a, b + 1) for a, b in zip(tr_k, tr_t)])
+    tr_c, tr_t, tr_k = tr_c[good], tr_t[good], tr_k[good]
     Xtr, names = feats(tr_c, tr_t, tr_k, T)
-    ytr = T[tr_c, tr_t + 1] - T[tr_c, tr_k]
-    ok = np.isfinite(ytr) & np.isfinite(Xtr[:, 5])
-    Xtr, ytr = Xtr[ok], ytr[ok]
+    mn_tr = MOY[np.minimum(tr_t + 1, NM - 1)]
+    A_tr = {a: anchor_of(a, tr_c, tr_k, mn_tr, T) for a in ANCHORS}
+    # one finite mask over every anchor, so each variant trains on exactly the same rows
+    ok = np.isfinite(T[tr_c, tr_t + 1]) & np.isfinite(Xtr[:, 5])
+    for a in ANCHORS:
+        ok &= np.isfinite(A_tr[a])
+    Xtr = Xtr[ok]
+    ytr = T[tr_c, tr_t + 1][ok] - A_tr[ANCHORS[0]][ok]
 
     # test-time TWS availability: everything before the window, plus the anchor months
     # themselves -- exactly what Test.csv exposes. Nothing else inside the window is observed.
@@ -282,10 +358,28 @@ def run(start):
     Xva, _ = feats(va_c, va_t, va_k, Tva)
     yva = T[va_c, va_t + 1]
     hva = (va_t - va_k + 1).astype(int)
-    m = lgb.train(PAR, lgb.Dataset(Xtr, ytr, feature_name=names), num_boost_round=700)
-    direct = T[va_c, va_k] + m.predict(Xva)
+    mn_va = MOY[np.minimum(va_t + 1, NM - 1)]
+    A_va = {a: anchor_of(a, va_c, va_k, mn_va, Tva) for a in ANCHORS}
+    pred, m = {}, None
+    for a in ANCHORS:
+        y = T[tr_c, tr_t + 1][ok] - A_tr[a][ok]
+        ma = lgb.train(PAR, lgb.Dataset(Xtr, y, feature_name=names), num_boost_round=700)
+        pred[a] = A_va[a] + ma.predict(Xva)
+        if a == ANCHORS[0]:
+            m = ma
+    direct = pred[ANCHORS[0]]
 
-    # --- recursive: an h=1 model chained forward, its own output fed in as tws_known
+    # --- recursive: an h=1 model chained forward, its own output fed in as tws_known.
+    # Settled in session 10a/10 and skipped by default now: it costs a second training per
+    # placement and answers a question that is closed.
+    if not RECUR:
+        finq = np.isfinite(yva)
+        for a in ANCHORS:
+            finq &= np.isfinite(pred[a])
+        res = {a: mixed(yva[finq], pred[a][finq], hva[finq]) for a in ANCHORS}
+        rp, _ = mixed(yva[finq], Tva[va_c, va_k][finq], hva[finq])
+        rc, _ = mixed(yva[finq], TMU[va_c, MOY[va_t + 1] - 1][finq], hva[finq])
+        return res, rp, rc, int(finq.sum())
     o1 = (tr_t - tr_k) == 0
     m1 = lgb.train(PAR, lgb.Dataset(Xtr[o1[ok]], ytr[o1[ok]], feature_name=names),
                    num_boost_round=700)
@@ -313,10 +407,35 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if args and not args[0].lstrip("-").isdigit():
         USE = set(args.pop(0).split(","))
-    for start in [int(x) for x in (args or ["100", "118", "136"])]:
-        rd, rr, rp, rc, ed, er, n = run(start)
+    tot = {a: [] for a in ANCHORS}
+    for start in [int(x) for x in (args or ["16", "44", "72"])]:
+        out = run(start)
+        if not RECUR:
+            res, rp, rc, n = out
+            print(f"start={start} ({MON[start]}) n={n}", flush=True)
+            print(f"  persistence {rp:.4f}  climatology {rc:.4f}")
+            base = res[ANCHORS[0]][0]
+            for a in ANCHORS:
+                r, mse = res[a]
+                tot[a].append(r)
+                d = f"  {r - base:+.4f}" if a != ANCHORS[0] else "  (incumbent)"
+                print(f"  anchor {a:4} {r:.4f}{d}")
+                print("    per-h  " + " ".join(f"{v:.3f}" for v in np.sqrt(mse)), flush=True)
+            continue
+        rd, rr, rp, rc, ed, er, n = out
         print(f"start={start} ({MON[start]}) n={n}", flush=True)
         print(f"  persistence {rp:.4f}  climatology {rc:.4f}  direct {rd:.4f}  "
               f"recursive {rr:.4f}  delta {rr-rd:+.4f}")
         print("  per-h direct    " + " ".join(f"{v:.3f}" for v in ed))
         print("  per-h recursive " + " ".join(f"{v:.3f}" for v in er), flush=True)
+    if not RECUR and len(ANCHORS) > 1:
+        # the standing rule: a change is adopted only if it wins on EVERY placement
+        base = np.array(tot[ANCHORS[0]])
+        print(f"\n  {'anchor':6} " + " ".join(f"{s:>8}" for s in ["p1", "p2", "p3"]) + "   verdict")
+        print(f"  {ANCHORS[0]:6} " + " ".join(f"{v:8.4f}" for v in base) + "   incumbent")
+        for a in ANCHORS[1:]:
+            v = np.array(tot[a]); d = v - base
+            win = bool((d < -0.0003).all())
+            print(f"  {a:6} " + " ".join(f"{x:8.4f}" for x in v) +
+                  ("   ADOPT: wins by >0.0003 on every placement" if win else
+                   f"   reject: deltas {' '.join(f'{x:+.4f}' for x in d)}"))

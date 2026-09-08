@@ -323,7 +323,11 @@ say "config: dropf='$FD' weights=$FW hmix='$FH'"
 # with no sign that anything is wrong. Record what each tag was trained with, and drop that tag's
 # markers when it changes.
 cfg_guard() {   # cfg_guard <tag> <dropf> <weights> <hmix> <families...>
-  t=$1; sig="dropf=$2 weights=$3 hmix=$4 fams=$(shift 4; echo "$@") seeds=$SEEDS"
+  # `shift 4` inside $( ) shifts a COPY of the positional parameters, so shift in the body: the
+  # round list must walk the families and nothing else, or the line that explains why 32 models
+  # were retrained lists r_bigsa=300 beside the two counts that are real.
+  t=$1; d=$2; w=$3; x=$4; shift 4
+  sig="dropf=$d weights=$w hmix=$x fams=$* seeds=$SEEDS"
   for m in "$@"; do sig="$sig r_$m=$(rd "$m")"; done
   f="$S/cfg$t.txt"
   if [ -f "$f" ] && [ "$(cat "$f")" != "$sig" ]; then
