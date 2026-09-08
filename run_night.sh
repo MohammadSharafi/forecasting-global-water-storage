@@ -254,7 +254,27 @@ H1R=$(grep -o 'best_iter=[0-9]*' "$S/h1_A.log" 2>/dev/null | tail -1 | cut -d= -
 say "rounds: $(for m in $FAMS; do printf '%s=%s ' "$m" "$(rd $m)"; done) h1=$H1R"
 say "config: dropf='$FD' weights=$FW hmix='$FH'"
 
+# A step's marker is its NAME, and a FINAL training step's name carries the seed and the family
+# but not the configuration it was trained under. So when select_config changes its answer between
+# runs -- which is exactly what fixing layout C will do -- the markers still match, every training
+# step is skipped, and the submission is assembled from models trained under the OLD configuration
+# with no sign that anything is wrong. Record what each tag was trained with, and drop that tag's
+# markers when it changes.
+cfg_guard() {   # cfg_guard <tag> <dropf> <weights> <hmix> <families...>
+  t=$1; sig="dropf=$2 weights=$3 hmix=$4 fams=$(shift 4; echo "$@") seeds=$SEEDS"
+  f="$S/cfg$t.txt"
+  if [ -f "$f" ] && [ "$(cat "$f")" != "$sig" ]; then
+    n=$(ls "$S"/F${t}_*.done 2>/dev/null | wc -l)
+    say "  [config changed for $t] was: $(cat "$f")"
+    say "                          now: $sig"
+    say "  discarding $n cached training step(s) for $t so they are retrained"
+    rm -f "$S"/F${t}_*.done
+  fi
+  printf '%s' "$sig" > "$f"
+}
+
 train_final() {   # train_final <tag> <dropf> <weights> <hmix> <families...>
+  cfg_guard "$@"
   t=$1; d=$2; w=$3; x=$4; shift 4
   for m in "$@"; do
     r=$(rd "$m"); s=0

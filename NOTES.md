@@ -937,3 +937,50 @@ be legal since it uses only months <= t_known.
 0.655935, which is 0.0400 away -- three times everything session 9 has gained. That gap will not
 close on incremental feature work, and the honest reading of the diagnostics is that the
 remaining large-scale error is regional and, so far, not shown to be predictable.
+
+# Session 9r — the band offset is closed, and a caching bug that would have corrupted the rerun
+
+## The largest identified prize is unreachable. Measured, not assumed.
+globalshift on the real layout-A predictions (`_bw`, the submitted blend):
+
+  band-offset error        12.9% of total MSE
+  ORACLE, perfect band correction   RMSE 0.5847  (-0.0418)
+
+  reachability, applying the PREVIOUS month's band offset:
+    a=0.25  +0.0003     a=0.50  +0.0055     a=0.75  +0.0155     a=1.00  +0.0302
+    corr(previous band offset, this band offset) = +0.190  over 85 band-months
+    corr(band's own recent observed change, its offset) = +0.062  over 85 band-months
+
+Every weight tried makes it WORSE, including the smallest. The arithmetic agrees: a linear
+predictor with correlation r removes r^2 of the component it targets, so the ceiling here is
+0.190^2 x 0.129 = 0.0047 of MSE, or -0.0015 RMSE, and that is fitted in sample. The second row is
+worse still: 0.062^2 x 0.129 = 0.0005 of MSE, -0.0002 RMSE. The oracle of -0.0418 is real and
+completely out of reach, because it needs the answer in order to compute the correction.
+
+Both offset avenues are now closed on evidence rather than on judgement: global (persistence corr
+-0.110, oracle -0.0090) and band (persistence corr +0.190, oracle -0.0418). Session 3 identified
+the regional coherent error as the largest error component and it has taken until now to
+establish that no part of it is predictable from information at <= t. That is a negative result,
+and it is worth as much as a positive one: it stops the remaining days being spent there.
+
+Taken with analyze_A's residual variogram (lag 1 +0.967, lag 2 +0.899, lag 3 +0.809), the picture
+is consistent and unwelcome. The dominant remaining error is a large-scale, spatially coherent,
+temporally white field. Spatial smoothing can only shave it (a neighbour has the same error,
+which is why the leaderboard paid exactly 0.0028 for it). Higher-resolution forcing cannot reach
+it, so ERA5-Land is not the answer either. And it does not persist month to month, so it cannot
+be corrected from history.
+
+## The caching bug: markers do not encode the configuration
+A step's marker is its NAME, and a FINAL training step's name carries the tag, the family and the
+seed -- but not the configuration it was trained under. So when select_config changes its answer
+between runs, which is EXACTLY what fixing layout C will do, the markers still match, every
+training step is skipped, and the submission is assembled from models trained under the OLD
+configuration with nothing anywhere to say so.
+
+This was about to happen: the 0.695965 configuration (DROPF='scale,bigsa', HMIX='test') was chosen
+with the broken layout C voting, and the rerun with C fixed will very likely choose differently.
+
+`cfg_guard` now records what each tag was trained with -- dropf, weights, hmix, the family list and
+the seed count -- and discards that tag's markers when any of it changes, printing the old and new
+signatures. Verified on a fixture: identical configuration keeps all three markers, a changed one
+discards them and says why.
