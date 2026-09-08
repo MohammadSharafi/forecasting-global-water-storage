@@ -4,6 +4,7 @@ usage: python build_mats.py A|B|C|FINAL
 The feature builder is exposed as prepare(L)['featfn'] so recursive.py can call it with an
 extended observation table (its own predictions fed forward) without a second copy of the pipeline.
 The script's output is unchanged by that refactor -- verified byte-identical."""
+import re
 import polars as pl, numpy as np, sys, time, gc, os, json
 from features import COV, training_rows, training_rows_coherent, cell_stats
 from features2 import clim_sums, assemble2, FEATS2
@@ -17,6 +18,20 @@ from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covw
 from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 from features_scale import add_scale, SCALE
 from features_gdo import load_gdo
+
+
+def base_of(L):
+    """'Ap3' -> 'A'.  A layout may carry its own PER_ROW as a suffix so that a training-set-size
+    sweep writes to its own matrices instead of overwriting the cached ones."""
+    m = re.fullmatch(r"([ABC])p(\d+)", L)
+    return m.group(1) if m else L
+
+
+def per_row_of(L, default=None):
+    m = re.fullmatch(r"([ABC])p(\d+)", L)
+    if m:
+        return int(m.group(2))
+    return int(os.environ.get("PER_ROW", "3")) if default is None else default
 
 
 def prepare(L, t0=None):
@@ -38,7 +53,7 @@ def prepare(L, t0=None):
     print("era5:", None if ERA is None else ERA.shape, flush=True)
     print("gdo:", gcols or "not present", flush=True)
     print("ext loaded", cols, cols2, cols3, f"({time.time()-t0:.0f}s)", flush=True)
-    if L == "FINAL":
+    if base_of(L) == "FINAL":
         te = pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
         cov_all = pl.concat([tr.select(["lat", "lon", "time"]+COV), te.select(["lat", "lon", "time"]+COV)])
         obs_hist = tr.select(["lat", "lon", "time", "TWS_t"])
@@ -49,7 +64,7 @@ def prepare(L, t0=None):
         rows_va = te.select(["ID", "lat", "lon", "time"]).join(known, on=["lat", "lon", "time"], how="left")
         meta_va = ["ID", "lat", "lon", "time", "t_known", "horizon", "tws_known"]
     else:
-        sfx = {"A": "", "B": "_B", "C": "_C"}[L]; tp = pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist = pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
+        sfx = {"A": "", "B": "_B", "C": "_C"}[base_of(L)]; tp = pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist = pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
         cov_all = tr.select(["lat", "lon", "time"]+COV)
         obs_hist = hist.select(["lat", "lon", "time", "TWS_t"])
         obs_all = pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat", "lon", "time", "TWS_t"])])
@@ -95,7 +110,7 @@ def main():
     Xva.select(list(dict.fromkeys(S["meta_va"]+F))).with_columns([pl.col(f).cast(pl.Float32) for f in F]).write_parquet(f"out/mats/{L}_va.parquet")
     print("va", Xva.shape, f"({time.time()-t0:.0f}s)", flush=True)
     del Xva; gc.collect()
-    Xtr, _ = S["featfn"](training_rows_coherent(S["hist"], np.random.default_rng(11 if L == "FINAL" else 0), per_row=int(os.environ.get("PER_ROW", "3"))), S["obs_hist"], True)
+    Xtr, _ = S["featfn"](training_rows_coherent(S["hist"], np.random.default_rng(11 if base_of(L) == "FINAL" else 0), per_row=per_row_of(L)), S["obs_hist"], True)
     Xtr.select(list(dict.fromkeys(["lat", "lon", "time", "t_known", "horizon", "tws_known", "target"]+F))).with_columns([pl.col(f).cast(pl.Float32) for f in F]).write_parquet(f"out/mats/{L}_tr.parquet")
     json.dump(F, open("out/mats/feats.json", "w")); print("tr", Xtr.shape, "nfeat", len(F), f"({time.time()-t0:.0f}s)", flush=True)
 

@@ -109,7 +109,8 @@ step diag_shift_B   "$PY globalshift.py B lgb_v5x_noll" || true
 # ---------------------------------------------------------------- 2. rebuild with every feature
 # Everything a step's result depends on, so a rewritten script can never be skipped again.
 src_guard val_C      validation_c.py
-src_guard build_     build_mats.py features.py features2.py features4.py features5.py features6.py \
+printf 'PER_ROW=%s' "${PER_ROW:-2}" > "$S/perrow.txt"   # a different PER_ROW is a different matrix
+src_guard build_     "$S/perrow.txt" build_mats.py features.py features2.py features4.py features5.py features6.py \
                      features_ncep.py features_era5.py features_x.py features_anom.py \
                      features_scale.py features_gdo.py
 src_guard anchor_    add_anchor_feats.py anchor.py

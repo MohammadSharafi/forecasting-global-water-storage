@@ -1348,3 +1348,39 @@ The repair changed the answer, which is the whole reason it mattered:
 So `out/sub_q_main.csv` from that run is a genuinely different model from the 0.695965 file: a
 different feature set, retrained from scratch, plus a horizon-1 specialist spliced in at half
 weight. It has not been scored yet.
+
+# Session 9z — an overnight run for a day with no submissions left
+
+The allowance is spent, so tonight has to buy ANSWERS and CANDIDATE FILES rather than another copy
+of what already exists. `run_tonight.sh`, resumable the same way run_night.sh is, cheapest and most
+certain first:
+
+  T1  blends of the existing submission files, needing no training at all
+  T2  recursive.py on A, B and C -- the measurement, where NOTES so far has only a bound
+  T3  the training-rows-per-cell-month sweep, never run in any session
+  T4  the full pipeline with whatever T3 decided, plus rounds.py's boosting-round correction
+  T5  a ranked list of candidates for tomorrow
+
+## The sweep is safe by construction
+A layout may now carry its own PER_ROW in its name: `Ap3` builds `out/mats/Ap3_*.parquet` from
+layout A's pseudo-test with per_row=3 and leaves `A_*` untouched. Verified -- after building Ap2,
+`A_tr.parquet` was byte-identical and four new Ap2 files existed. That property is what makes it
+safe to sweep a parameter that changes every matrix, on a machine holding a working submission.
+
+perrow_scan.py scores each variant under the real test horizon mix and adopts one only if it wins
+on EVERY layout swept. Verified on fixtures: a p3 that wins on both A and B is adopted; a p4 that
+wins on A and loses on B is rejected with both numbers printed.
+
+PER_ROW is now part of the build_ source fingerprint, so changing it invalidates the cached
+matrices instead of silently mixing a p2 matrix with a p3 decision.
+
+## Honest expectation
+T1 costs nothing and tests something the fitted ensemble weight got wrong before. T2 closes or
+reopens an avenue. T3 is a genuine unknown -- more pairs reuse the same observations, so they add
+coverage of the (horizon, staleness) space rather than independent information, and the answer
+could be zero. T4's round correction is the one with a clear mechanism: FINAL has been trained on
+~30% more history than the layout whose early stopping set its round count.
+
+None of it closes the gap to 0.65. The five avenues closed on measurement in REPORT.md section 4
+still stand, and the dominant remaining error is still large-scale, spatially coherent and
+temporally white.
