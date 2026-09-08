@@ -120,6 +120,7 @@ src_guard eval_grid_ eval_mix.py
 src_guard select     select_config.py eval_mix.py xfit.py
 src_guard analyze_   analyze.py
 src_guard roundscan  rounds.py
+src_guard check_FINAL check_final.py
 src_guard F          run_models.py
 # the scans are cheap and every one of them reads every layout, so they follow the layouts
 src_guard blendscan   blend_scan.py xfit.py
@@ -287,15 +288,7 @@ done
 head1 "PHASE 6  FINAL matrix"
 step build_FINAL  "PER_ROW=${PER_ROW:-2} $PY build_mats.py FINAL" || true
 done_ build_FINAL && { step anchor_FINAL "$PY add_anchor_feats.py FINAL" || true; }
-step check_FINAL "$PY - <<'EOF'
-import json,sys,polars as pl
-want=set(json.load(open('out/mats/feats.json')))
-have=set(pl.scan_parquet('out/mats/FINAL_va.parquet').collect_schema().names())
-have|=set(pl.scan_parquet('out/mats/FINAL_va_anchor.parquet').collect_schema().names())
-m=sorted(want-have)
-print(('MISSING %d e.g. %s'%(len(m),m[:6])) if m else 'FINAL carries all %d features'%len(want))
-sys.exit(1 if m else 0)
-EOF" || true
+step check_FINAL "$PY check_final.py" || true
 
 # boosting rounds: whatever early stopping chose for that family on the chosen configuration
 # rounds.py corrects for the fact that FINAL trains on ~30% more history than the layout whose

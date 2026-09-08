@@ -1300,3 +1300,51 @@ None of it closes the gap to 0.65. sub_q_base and sub_q_alt bracket the current 
 0.6980; the blend and the round correction are each worth thousandths at best. The honest position
 is in REPORT.md section 4: five avenues closed on measurement, and the dominant remaining error is
 large-scale, spatially coherent and temporally white.
+
+# Session 9y — check_FINAL was mangled by eval, and it gates ALL final training
+
+## The bug
+`step` passes its command string to `eval`, which re-parses the quoting. The check_FINAL step was
+an inline Python heredoc, and after that second parse it arrived as
+
+    have=set(pl.scan_parquet(n')))
+    SyntaxError: unterminated string literal
+
+so the step failed. And check_FINAL GATES phase 7:
+
+    if done_ check_FINAL; then   ... all FINAL training ...   fi
+
+In the clean integration run on this container the log goes straight from PHASE 6 to PHASE 9: no
+FINAL training happened at all, and the run still wrote five submission files from whatever
+predictions were already on disk, reported "steps that did not complete: check_FINAL", and looked
+otherwise normal. That is the most expensive failure this orchestrator can have -- it produces a
+plausible submission built from nothing that ran.
+
+The entrant's runs escaped it only because check_FINAL carried a `.done` marker from an older run
+where the string happened to survive. A fresh machine, a FORCE=1 run, or any src_guard clear would
+have hit it.
+
+Moved to `check_final.py`. A file cannot be mangled by eval. Verified through the identical
+`( eval ... )` path: exit 0, "FINAL carries all 201 features".
+
+## Confirmed working in the same run
+CodeCarbon end to end inside the orchestrator: 39 training runs measured, 1.86 hours, 0.0264 kWh,
+split by phase, written to out/carbon/summary.md. This is the live measurement the sustainability
+criterion asks for, on the runs that actually happened.
+
+## The entrant's run, with layout C repaired
+The repair changed the answer, which is the whole reason it mattered:
+
+  configuration   DROPF='scale,bigsa' -> DROPF='bigsa'
+                  the zonal features are now KEPT; the broken C had voted them out
+  cfg_guard       fired on both _f1 and _f2, discarded 32 cached training steps each, retrained
+  h=1 specialist  ADOPTED at beta=0.50 -- hsplice had rejected it every time the broken layout C
+                  was in the vote. 16 seeds trained in phase 7b.
+  seasonal        still rejected, now on trustworthy evidence
+  stack           lgb 0.500 / xgb 0.500
+  smoothing       incumbent kept (0.7, r=1, it=1)
+  elapsed         3 h
+
+So `out/sub_q_main.csv` from that run is a genuinely different model from the 0.695965 file: a
+different feature set, retrained from scratch, plus a horizon-1 specialist spliced in at half
+weight. It has not been scored yet.
