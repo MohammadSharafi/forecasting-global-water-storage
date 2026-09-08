@@ -1384,3 +1384,102 @@ could be zero. T4's round correction is the one with a clear mechanism: FINAL ha
 None of it closes the gap to 0.65. The five avenues closed on measurement in REPORT.md section 4
 still stand, and the dominant remaining error is still large-scale, spatially coherent and
 temporally white.
+
+# Session 10 — recursion is settled, the training-row sweep is a clean zero
+
+Both were run overnight by `run_tonight.sh` on a day with no submissions left, and both bought an
+ANSWER rather than another copy of a file that already exists.
+
+## T2 — recursive forecasting: the measurement, and it agrees with the bound
+
+`recursive.py` trains a horizon-1 model, chains it month by month through `build_mats.prepare`'s
+own feature builder (49/41/45 monthly steps on A/B/C) and scores direct against recursive per
+horizon. All three layouts, every horizon, the same direction:
+
+              layout A            layout B            layout C
+    h   direct  recur   r-d   direct  recur   r-d   direct  recur   r-d
+    1   0.6232 0.6238 +0.0006 0.4974 0.4985 +0.0011 0.4666 0.4860 +0.0194
+    2   0.5349 0.5658 +0.0309 0.5491 0.5985 +0.0494 0.5349 0.5697 +0.0348
+    3   0.5484 0.5803 +0.0319 0.5544 0.6212 +0.0668 0.5390 0.5650 +0.0260
+    4   0.7362 0.7967 +0.0605 0.5386 0.6314 +0.0929 0.5595 0.5763 +0.0168
+    5   0.7974 0.8260 +0.0286 0.5652 0.6609 +0.0957 0.5914 0.6823 +0.0909
+    6   0.9906 1.0182 +0.0276 0.5994 0.7270 +0.1275 0.6390 0.7222 +0.0832
+    7   0.5059 0.6016 +0.0957 0.5397 0.6641 +0.1244 0.6158 0.7128 +0.0969
+
+  test-mix RMSE   A  direct 0.6383  recursive 0.6657      B  0.5356 / 0.5909      C  0.5315 / 0.5692
+  a 50/50 blend of the two is also worse than direct everywhere: 0.6434, 0.5523, 0.5364
+
+Recursion loses at 21 of 21 (layout, horizon) cells, it loses by MORE as the horizon grows -- the
+opposite of the only shape that would have justified building it out -- and even the free half-and-
+half blend loses. The bound in session 9t argued this from arithmetic on numbers confounded with
+calendar month; the measurement now says the same thing on real data with the confound removed, so
+the avenue is closed on evidence rather than on an argument. REPORT.md section 4 carries the
+measured numbers and no longer carries a [pending].
+
+Worth being precise about WHY, because it is the same reason the bound gave: the h=1 model is not
+materially better than the direct model at h=1 (0.6232 vs 0.6238 on A). Recursion therefore pays
+the full h=1 error as an anchor and then compounds it, while the direct model gets to see the true
+last observation. There is no error to save, only error to accumulate.
+
+The one caveat, stated so the conclusion survives it: the chain's h=1 model is deliberately cheap
+-- non-anchor features, a flat 300 rounds, no ramp weighting -- while `direct` is the chosen
+configuration with its early-stopped round count. So the chain is handicapped at its own anchor,
+which is most visible on C (+0.0194 at h=1). It does not matter. Grant recursion a PERFECT anchor,
+equal to direct's own h=1 error, and the h>=2 gaps it would still have to overcome are +0.03 to
++0.13 -- one to two orders of magnitude larger than the handicap. The project's own tuned h=1
+specialist is the same evidence from the other side: hsplice adopted it at beta=0.50, i.e. worth
+half a vote at horizon 1, not the step change a chain would need to pay for seven of them.
+
+## T3 — training rows per cell-month: a clean, well-measured zero
+
+`build_mats` defaults to 3 training pairs per cell-month; the orchestrator has passed 2 since it
+was written, and no session had ever checked which is right.
+
+    test-mix RMSE     p2 (incumbent)      p3
+      layout A            0.6383       0.6407   +0.0024
+      layout B            0.5356       0.5362   +0.0006
+    p3 does not clear 0.0003 on either layout -> PER_ROW=2 kept
+
+p3 is worse on both, so this is not even a close call needing the every-layout rule to break it.
+The mechanism was predicted in 9z and holds: extra pairs reuse the same observations, so they add
+(horizon, staleness) coverage rather than independent information, and here they add correlated
+rows that dilute the ones that matter. The sweep was safe by construction -- `Ap3` builds
+`out/mats/Ap3_*.parquet` and leaves `A_*` untouched -- so a working submission was never at risk.
+
+## T4 — the pipeline reran with the boosting-round correction
+
+PER_ROW did not move, so every cached matrix, layout and configuration decision was correctly
+reused (phases 1-5c all skipped, src_guard fingerprints unchanged). The one thing that DID change
+is rounds.py's correction, and it changed cfg_guard's signature for all three FINAL tags, which
+discarded 32 cached training steps each and retrained them -- which is exactly what that guard was
+built for.
+
+    FINAL trains on 138 history months against layout A's 111
+    every family: power law REJECTED (fit 0-8%), plain ratio used, 1.24x
+    lgb 330->410   lgbs 511->635   lgbm 411->511   xgb 185->230   cat 364->453
+
+The power law being rejected for all five families is itself a result. Layout C has FEWER months
+than A (75 vs 111) but early-stops LATER (361 vs 330 for lgb), so the round count is not a function
+of training size alone -- layout difficulty and horizon mix move it too. Three points that do not
+lie on a curve is precisely the case rounds.py was written to refuse to fit, and it fell back to
+the conservative ratio, capped, never below the incumbent.
+
+## A defect in the audit trail: cfg_guard's round list
+
+    sig="dropf=$2 weights=$3 hmix=$4 fams=$(shift 4; echo "$@") seeds=$SEEDS"
+    for m in "$@"; do sig="$sig r_$m=$(rd "$m")"; done
+
+`shift 4` runs inside a command substitution, so it shifts a COPY of the positional parameters and
+the caller's `$@` is untouched. The loop therefore walks the tag, dropf, weights and hmix as if
+they were model families, and `rd` returns its 300 default for each:
+
+    r__f1=300 r_bigsa=300 r_ramp=300 r_test=300 r_lgb=410 r_xgb=230
+                                                ^^^^^^^^^^^^^^^^^^^ the only two that are real
+
+The signature is still a deterministic function of its inputs, so the guard cannot MISS a change
+and no run has been mistrained by this. What it corrupts is the log line that tells a reader what
+changed and why 32 models were retrained -- and that line is the audit trail for the single most
+expensive decision the orchestrator makes. Reproduced in a fixture, fixed by shifting in the
+function body, verified to produce `r_lgb=410 r_xgb=230` and nothing else. Not edited while the
+run was in flight: /bin/sh reads a script by byte offset as it executes, so editing a running
+shell script can corrupt it mid-run.

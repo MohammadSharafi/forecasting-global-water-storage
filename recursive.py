@@ -132,14 +132,28 @@ def main():
         pl.col("time").map_elements(lambda t: add_month(t, 1), return_dtype=pl.Date).alias("tm"))
     ans = tgt.join(obs.rename({"time": "tm", "TWS_t": "prec"}), on=["lat", "lon", "tm"], how="left")
     prec = ans["prec"].to_numpy()
-    prec = np.where(np.isfinite(prec), prec, kdirect)   # fall back to persistence if a chain broke
+    # A broken chain falls back to persistence, which is WORSE than either model being compared, so
+    # a silent fallback would make recursion look worse than it is. Report it: the comparison is
+    # only trustworthy while this is a negligible fraction.
+    broke = ~np.isfinite(prec)
+    if broke.any():
+        print(f"  WARNING  {int(broke.sum())} of {len(prec)} rows ({100*broke.mean():.2f}%) never "
+              f"reached their target month; those fall back to persistence", flush=True)
+    else:
+        print("  every row's chain reached its target month (no persistence fallback)", flush=True)
+    prec = np.where(np.isfinite(prec), prec, kdirect)
 
     # ---- the direct model, scored the same way, for the comparison
+    # If this fell through silently, "direct" would be persistence and recursion would be flattered
+    # by the comparison. Say which one is being scored.
     try:
         from eval_mix import load
         direct = load(L, ["lgb_v5x_noll:_bw"])
+        print("  direct = lgb_v5x_noll:_bw", flush=True)
     except SystemExit:
         direct = kdirect
+        print("  WARNING  direct predictions not found -- 'direct' below IS persistence, and the "
+              "comparison does not answer the question", flush=True)
 
     print(f"\n  {'horizon':>8} {'n':>7} {'persist':>9} {'direct':>9} {'recursive':>10} {'r-d':>8}")
     for i in range(1, 8):

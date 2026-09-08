@@ -43,7 +43,18 @@ def main():
         wsum += float(w)
     p = acc / wsum
     assert np.isfinite(p).all() and len(p) == 280961, f"{len(p)} rows, expected 280961"
-    pl.DataFrame({"ID": ids, "Target": np.round(p, 6)}).write_csv(out, float_precision=6)
+    # Write in Test.csv's own row order, not sorted-ID order. Every other submission this project
+    # produces comes out of final_assemble in test order, and a blend that differs from them only
+    # in row order is an unnecessary difference in a file that gets uploaded. Matching is by ID
+    # either way; this just removes the question.
+    df = pl.DataFrame({"ID": ids, "Target": np.round(p, 6)})
+    try:
+        order = pl.read_csv("Test.csv", columns=["ID"])
+        df = order.join(df, on="ID", how="left")
+        assert df["Target"].null_count() == 0 and len(df) == 280961, "ID mismatch vs Test.csv"
+    except FileNotFoundError:
+        print("  Test.csv not found -- writing in sorted-ID order")
+    df.write_csv(out, float_precision=6)
     print(f"  -> {out}  ({len(p)} rows, mean {p.mean():+.5f}, sd {p.std():.5f})")
     # how far the blend sits from each input, which bounds how much the score can move
     for path, _ in spec:

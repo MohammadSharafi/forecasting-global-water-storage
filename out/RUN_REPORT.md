@@ -1,20 +1,21 @@
 # Overnight run report
 
-Generated 2026-09-08 07:39.
-173 steps completed, 0 did not.
+Generated 2026-09-08 23:58.
+193 steps completed, 0 did not.
 
 ## Submission files
 
 - `out/sub_q_alt.csv` (8.2 MB)
 - `out/sub_q_base.csv` (8.2 MB)
 - `out/sub_q_main.csv` (8.2 MB)
+- `out/sub_q_main_cal.csv` (8.2 MB)
 - `out/sub_q_main_nocal.csv` (8.2 MB)
 - `out/sub_q_main_nosm.csv` (8.2 MB)
 
 ## Configuration chosen
 
 ```sh
-FINAL_DROPF='scale,bigsa'
+FINAL_DROPF='bigsa'
 FINAL_MODEL=lgb
 FINAL_WEIGHTS=ramp
 FINAL_HMIX='test'
@@ -25,8 +26,8 @@ FINAL_SMOOTH_W7=0.7
 FINAL_SMOOTH_R=1
 FINAL_SMOOTH_IT=1
 FINAL_SMOOTH_WRAP=0
-FINAL_H1BETA=0.00
-FINAL_CALIB=1.1300,1.1050,1.0293,0.9719,0.9875,0.9817,0.9998
+FINAL_H1BETA=0.50
+FINAL_CALIB=
 FINAL_CALIB_B=
 ```
 
@@ -35,17 +36,17 @@ FINAL_CALIB_B=
 ```
 
   experiment                      testmix A   testmix B   testmix C   
-  e1 base (pre-session-9)         0.6558     0.5577     0.7900
+  e1 base (pre-session-9)         0.6558     0.5577     0.5490
   e2 +covariate anomalies         0.6402     0.5376        -  
   e3 +zonal scale                 0.6551     0.5568        -  
-  e4 +anomalies +zonal            0.6397     0.5377     0.7853
-  e8 +1500/2500 km anchors        0.6397     0.5376     0.7779
+  e4 +anomalies +zonal            0.6397     0.5377     0.5290
+  e8 +1500/2500 km anchors        0.6397     0.5376     0.5296
   e5 all, 63 leaves               0.6402     0.5373        -  
   e6 all, 31 leaves               0.6407     0.5384        -  
   e7 all, uniform weights         0.6404     0.5402        -  
   e9 all, test horizon mix        0.6389     0.5344        -  
 
-  features: e2 (+covariate anomalies) -> DROPF='scale,bigsa'
+  features: e4 (+anomalies +zonal) -> DROPF='bigsa'
   capacity: lgb
   weights : ramp
   hmix    : test
@@ -119,21 +120,21 @@ layout B: 312102 rows
 ## Grid scored under the real test horizon mix -- layout C
 
 ```
-layout C: 140491 rows
+layout C: 280782 rows
   horizon share   h1  h2  h3  h4  h5  h6  h7
-    this layout   0.445  0.110  0.000  0.111  0.000  0.000  0.000
+    this layout   0.334  0.222  0.166  0.110  0.055  0.055  0.056
     real test     0.333  0.222  0.167  0.111  0.056  0.056  0.056
-    difference    +0.111  -0.112  -0.167  -0.000  -0.056  -0.055  -0.056
+    difference    +0.000  -0.001  -0.001  -0.001  -0.001  -0.000  +0.000
 
   set                       plain  testmix   h1      h2      h3      h4      h5      h6      h7    
-  persistence              0.8772   1.0947   0.7743  1.1186  nan  0.6311  nan  2.4860  nan
-  e1_base                  0.6536   0.7900   0.6379  0.7982  nan  0.5022  nan  1.6184  nan  (+0.0000)
-  e4_anom_zonal            0.6302   0.7853   0.6189  0.7736  nan  0.4746  nan  1.6950  nan  (-0.0047)
-  e8_bigsa                 0.6268   0.7779   0.6150  0.7723  nan  0.4669  nan  1.6657  nan  (-0.0121)
+  persistence              0.7181   0.7171   0.5261  0.6593  0.7323  0.8065  0.9131  1.0271  1.0285
+  e1_base                  0.5497   0.5490   0.4831  0.5536  0.5599  0.5822  0.5963  0.6601  0.6242  (+0.0000)
+  e4_anom_zonal            0.5297   0.5290   0.4664  0.5345  0.5348  0.5554  0.5827  0.6339  0.6108  (-0.0200)
+  e8_bigsa                 0.5303   0.5296   0.4675  0.5341  0.5360  0.5534  0.5816  0.6362  0.6158  (-0.0194)
 
   per-horizon difference vs the first set (negative = better):
-  e4_anom_zonal          -0.0189  -0.0245  +nan  -0.0276  +nan  +0.0766  +nan
-  e8_bigsa               -0.0228  -0.0258  +nan  -0.0352  +nan  +0.0473  +nan
+  e4_anom_zonal          -0.0167  -0.0191  -0.0251  -0.0268  -0.0136  -0.0262  -0.0133
+  e8_bigsa               -0.0156  -0.0195  -0.0238  -0.0288  -0.0148  -0.0239  -0.0084
 ```
 
 ## Ensemble weight (lgb vs xgb)
@@ -141,34 +142,34 @@ layout C: 140491 rows
 ```
 
   w_lgb   A   B   C
-   0.00   0.6387   0.5362   0.7841
-   0.05   0.6386   0.5360   0.7838
-   0.10   0.6384   0.5359   0.7835
-   0.15   0.6383   0.5357   0.7832
-   0.20   0.6382   0.5356   0.7830
-   0.25   0.6381   0.5355   0.7828
-   0.30   0.6380   0.5354   0.7826
-   0.35   0.6379   0.5353   0.7824
-   0.40   0.6379   0.5353   0.7822
-   0.45   0.6378   0.5352   0.7821
-   0.50   0.6378   0.5352   0.7820
-   0.55   0.6378   0.5352   0.7819
-   0.60   0.6378   0.5351   0.7818
-   0.65   0.6378   0.5351   0.7817
-   0.70   0.6379   0.5352   0.7817
-   0.75   0.6379   0.5352   0.7817
-   0.80   0.6380   0.5352   0.7817
-   0.85   0.6380   0.5353   0.7818
-   0.90   0.6381   0.5354   0.7818
-   0.95   0.6382   0.5355   0.7819
-   1.00   0.6383   0.5356   0.7820
+   0.00   0.6387   0.5362   0.5329
+   0.05   0.6386   0.5360   0.5326
+   0.10   0.6384   0.5359   0.5324
+   0.15   0.6383   0.5357   0.5322
+   0.20   0.6382   0.5356   0.5320
+   0.25   0.6381   0.5355   0.5318
+   0.30   0.6380   0.5354   0.5317
+   0.35   0.6379   0.5353   0.5315
+   0.40   0.6379   0.5353   0.5314
+   0.45   0.6378   0.5352   0.5313
+   0.50   0.6378   0.5352   0.5312
+   0.55   0.6378   0.5352   0.5312
+   0.60   0.6378   0.5351   0.5311
+   0.65   0.6378   0.5351   0.5311
+   0.70   0.6379   0.5352   0.5311
+   0.75   0.6379   0.5352   0.5311
+   0.80   0.6380   0.5352   0.5312
+   0.85   0.6380   0.5353   0.5312
+   0.90   0.6381   0.5354   0.5313
+   0.95   0.6382   0.5355   0.5314
+   1.00   0.6383   0.5356   0.5315
 
-  best per layout: {'A': 0.55, 'B': 0.6, 'C': 0.75}
+  best per layout: {'A': 0.55, 'B': 0.6, 'C': 0.65}
   leave-one-layout-out choice:
-  chosen on B+C -> 0.7; on held-out A: +0.00003
-  chosen on A+C -> 0.7; on held-out B: -0.00001
-  chosen on A+B -> 0.6; on held-out C: -0.00017
-  best overall 0.65: on each layout ['+0.00000', '-0.00003', '-0.00022']
+  chosen on B+C -> 0.65; on held-out A: +0.00000
+  chosen on A+C -> 0.65; on held-out B: -0.00003
+  chosen on A+B -> 0.6; on held-out C: -0.00009
+  best overall 0.6: on each layout ['-0.00001', '-0.00003', '-0.00009']
   does not clear 0.0002 out of sample everywhere -- keeping the incumbent 0.5
 ```
 
@@ -178,11 +179,11 @@ layout C: 140491 rows
   families on every layout: ['lgb_v5x_noll', 'xgb_v5x_noll', 'lgbs_v5x_noll', 'lgbm_v5x_noll', 'cat_v5x_noll']
 
                                                weights   A  B  C
-  incumbent lgb:0.50 xgb:0.50 lgbs:0.00 lgbm:0.00 cat:0.00   0.6378  0.5352  0.7820
-  fitted    lgb:0.38 xgb:0.47 lgbs:0.00 lgbm:0.00 cat:0.14   0.6378  0.5366  0.7784
-  fitted on B+C, scored on A: +0.00000
-  fitted on A+C, scored on B: +0.00232
-  fitted on A+B, scored on C: +0.00063
+  incumbent lgb:0.50 xgb:0.50 lgbs:0.00 lgbm:0.00 cat:0.00   0.6378  0.5352  0.5312
+  fitted    lgb:0.39 xgb:0.43 lgbs:0.00 lgbm:0.19 cat:0.00   0.6378  0.5349  0.5309
+  fitted on B+C, scored on A: +0.00005
+  fitted on A+C, scored on B: +0.00084
+  fitted on A+B, scored on C: -0.00028
   held-out gain does not clear 0.0003 everywhere -- keeping the incumbent blend
 ```
 
@@ -212,22 +213,22 @@ layout C: 140491 rows
    0.80  0.90  1   1  True   0.5310     -0.00004
    0.80  0.70  1   1 False   0.5310     -0.00004
 
-  layout C: incumbent (0.7, r1, it1, no wrap) = 0.8655
+  layout C: incumbent (0.7, r1, it1, no wrap) = 0.5273
      w1    w7  r  it  wrap   testmix     vs incumbent
-   0.00  0.00  1   1 False   0.7820     -0.08350
-   0.00  0.00  1   1  True   0.7820     -0.08350
-   0.00  0.00  2   1 False   0.7820     -0.08350
-   0.00  0.00  2   1  True   0.7820     -0.08350
-   0.00  0.00  1   2 False   0.7820     -0.08350
-   0.00  0.00  2   2 False   0.7820     -0.08350
-   0.20  0.00  1   1  True   0.7845     -0.08099
-   0.20  0.00  1   1 False   0.7845     -0.08099
+   0.80  0.60  1   1  True   0.5273     -0.00005
+   0.80  0.60  1   1 False   0.5273     -0.00004
+   0.80  0.50  1   1  True   0.5273     -0.00004
+   0.50  0.50  1   2 False   0.5273     -0.00003
+   0.80  0.50  1   1 False   0.5273     -0.00003
+   0.80  0.70  1   1  True   0.5273     -0.00003
+   0.90  0.50  1   1  True   0.5273     -0.00002
+   0.70  0.60  1   1  True   0.5273     -0.00002
 
   leave-one-layout-out choice:
-  chosen on B+C -> (0.0, 0.0, 2, 1, False); on held-out A: +0.00312
-  chosen on A+C -> (0.0, 0.0, 2, 1, False); on held-out B: +0.00415
-  chosen on A+B -> (0.5, 0.5, 1, 2, False); on held-out C: +0.00564
-  best overall (0.0, 0.0, 2, 1, False): on each layout ['+0.00312', '+0.00415', '-0.08350']
+  chosen on B+C -> (0.5, 0.5, 1, 2, False); on held-out A: -0.00007
+  chosen on A+C -> (0.5, 0.5, 1, 2, False); on held-out B: -0.00020
+  chosen on A+B -> (0.5, 0.5, 1, 2, False); on held-out C: -0.00003
+  best overall (0.5, 0.5, 1, 2, False): on each layout ['-0.00007', '-0.00020', '-0.00003']
   does not clear 0.0003 out of sample everywhere -- keeping the incumbent (0.7, 0.7, 1, 1, False)
   chosen: w1=0.7 w7=0.7 radius=1 iters=1 wrap=False
 ```
@@ -244,17 +245,16 @@ layout C: 140491 rows
     beta   0.00   0.10   0.20   0.30   0.40   0.50   0.60   0.70   0.80   0.90   1.00
     mix  +0.0000 -0.0002 -0.0003 -0.0004 -0.0005 -0.0006 -0.0006 -0.0006 -0.0006 -0.0006 -0.0005
 
-  layout C: RMSE at h=1 -- general 0.6193, specialist 0.6387
+  layout C: RMSE at h=1 -- general 0.4662, specialist 0.4669
     beta   0.00   0.10   0.20   0.30   0.40   0.50   0.60   0.70   0.80   0.90   1.00
-    mix  +0.0000 +0.0004 +0.0009 +0.0015 +0.0021 +0.0028 +0.0035 +0.0044 +0.0052 +0.0062 +0.0072
+    mix  +0.0000 -0.0001 -0.0002 -0.0003 -0.0004 -0.0004 -0.0003 -0.0002 -0.0001 +0.0000 +0.0002
 
   leave-one-layout-out choice:
-  chosen on B+C -> 0.0; on held-out A: +0.00000
-  chosen on A+C -> 0.0; on held-out B: +0.00000
-  chosen on A+B -> 0.6; on held-out C: +0.00354
-  best overall 0.0: on each layout ['+0.00000', '+0.00000', '+0.00000']
-  does not clear 0.0003 out of sample everywhere -- keeping the incumbent 0.0
-  not adopted: beta=0.00
+  chosen on B+C -> 0.5; on held-out A: -0.00046
+  chosen on A+C -> 0.5; on held-out B: -0.00060
+  chosen on A+B -> 0.6; on held-out C: -0.00031
+  best overall 0.5: on each layout ['-0.00046', '-0.00060', '-0.00035']
+  adopted: beta=0.50
 ```
 
 ## Per-horizon calibration
@@ -273,19 +273,16 @@ layout C: 140491 rows
     scale  (affine) 1.073 1.052 1.036 0.950 1.037 0.984 0.996
     offset (affine) -0.029 -0.032 -0.034 -0.038 +0.073 -0.037 -0.071
 
-  layout C: mean prediction - truth = -0.0794
+  layout C: mean prediction - truth = -0.0218
     h1 h2 h3 h4 h5 h6 h7
-    scale  (scale) 1.170 1.200 1.000 0.948 1.000 1.000 1.000
-    scale  (affine) 1.169 1.200 1.000 0.943 1.000 1.000 1.000
-    offset (affine) +0.005 +0.100 +0.000 +0.029 +0.000 +0.000 +0.000
+    scale  (scale) 0.972 1.064 1.091 1.074 1.096 1.127 1.120
+    scale  (affine) 0.972 1.069 1.090 1.079 1.088 1.127 1.117
+    offset (affine) -0.016 +0.014 +0.007 +0.070 +0.045 +0.006 +0.019
 
-  scale: fitted on the other layouts, scored held out: A -0.00150  B -0.00066  C -0.00391
+  scale: fitted on the other layouts, scored held out: A -0.00031  B -0.00030  C +0.00047
 
-  affine: fitted on the other layouts, scored held out: A -0.00137  B +0.00089  C -0.00041
-
-  adopted the scale form
-    scale  1.130 1.105 1.029 0.972 0.988 0.982 1.000
-    on each layout: ['-0.00177', '-0.00084', '-0.00681']
+  affine: fitted on the other layouts, scored held out: A -0.00057  B -0.00037  C +0.00219
+  no form clears 0.0003 out of sample everywhere -- no calibration
 ```
 
 ## What is in the data
