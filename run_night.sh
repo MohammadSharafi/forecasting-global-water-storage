@@ -67,6 +67,24 @@ astep() {
 }
 done_() { [ -f "$S/$1.done" ]; }
 
+# A marker records that a step SUCCEEDED, not what it succeeded at. cfg_guard covers the
+# configuration; nothing covered the CODE, and on 2026-09-08 that cost a whole run: validation_c.py
+# had been rewritten to repair layout C, but the val_C marker from the previous run survived, so C
+# was never rebuilt, select_config never re-ran, and a seven-hour invocation finished in five
+# seconds having changed nothing. src_guard fingerprints the sources a family of steps depends on
+# and drops those markers when the fingerprint moves.
+src_guard() {   # src_guard <marker prefix> <source files...>
+  t=$1; shift
+  sig=$(cat "$@" 2>/dev/null | cksum | cut -d' ' -f1)
+  f="$S/src_$t.txt"
+  if [ -f "$f" ] && [ "$(cat "$f")" != "$sig" ]; then
+    n=$(ls "$S"/${t}*.done 2>/dev/null | wc -l)
+    [ "$n" -gt 0 ] && say "  [source changed] $t: discarding $n cached step(s) so they re-run"
+    rm -f "$S"/${t}*.done
+  fi
+  printf '%s' "$sig" > "$f"
+}
+
 : > "$R"
 head1 "RUN START   seeds=$SEEDS wide=$WIDE deep=${DEEP:-0} layoutC=$LAYOUT_C budget=${BUDGET_H}h"
 say "branch $(git rev-parse --abbrev-ref HEAD 2>/dev/null)  commit $(git rev-parse --short HEAD 2>/dev/null)"
@@ -89,6 +107,27 @@ step diag_shift_A   "$PY globalshift.py A lgb_v5x_noll" || true
 step diag_shift_B   "$PY globalshift.py B lgb_v5x_noll" || true
 
 # ---------------------------------------------------------------- 2. rebuild with every feature
+# Everything a step's result depends on, so a rewritten script can never be skipped again.
+src_guard val_C      validation_c.py
+src_guard build_     build_mats.py features.py features2.py features4.py features5.py features6.py \
+                     features_ncep.py features_era5.py features_x.py features_anom.py \
+                     features_scale.py features_gdo.py
+src_guard anchor_    add_anchor_feats.py anchor.py
+src_guard x_         run_models.py
+src_guard cv_        run_models.py
+src_guard h1_        run_models.py
+src_guard eval_grid_ eval_mix.py
+src_guard select     select_config.py eval_mix.py xfit.py
+src_guard analyze_   analyze.py
+src_guard F          run_models.py
+# the scans are cheap and every one of them reads every layout, so they follow the layouts
+src_guard blendscan   blend_scan.py xfit.py
+src_guard stackscan   stack.py xfit.py
+src_guard smoothscan  smooth_scan.py smooth.py xfit.py
+src_guard hsplicescan hsplice.py xfit.py
+src_guard seasonscan  seasonal.py xfit.py
+src_guard postcalscan postcal.py xfit.py
+
 head1 "PHASE 2  rebuild the validation layouts (covariate anomalies, windows, modelled TWS, zonal, 5 anchor radii)"
 LAYOUTS="A B"
 if [ "$LAYOUT_C" = 1 ]; then

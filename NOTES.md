@@ -1157,3 +1157,45 @@ than a rewrite. New material a code reviewer will care about:
     despite the held-out gate adopting it).
 
 The old version is not kept as a file; it is in git history at 2f8caf6.
+
+# Session 9v — a rewritten script was skipped, and a seven-hour run finished in five seconds
+
+The entrant pulled the layout-C repair and started `DEEP=1 ./run_night.sh`. It completed in five
+seconds having changed nothing of substance:
+
+  [skip] val_C      validation_c.py had been REWRITTEN, but the marker from the previous run
+  [skip] build_C    survived, so layout C was never rebuilt and is still the broken one with four
+  [skip] x_C_*      empty horizons
+  [skip] select     so the configuration was never re-chosen; it is still the one the broken C
+                    voted for -- DROPF='scale,bigsa', HMIX='test'
+
+cfg_guard did not fire, correctly: the configuration did not change, because the step that chooses
+it never ran. seasonscan DID run (it had no marker, being new) and rejected the seasonal
+correction -- but it ran with the broken layout C in the vote, so that decision is not trustworthy
+either. carbon failed because no training happened at all.
+
+## The gap
+A marker records that a step SUCCEEDED. It does not record WHAT it succeeded at. cfg_guard covers
+the configuration; nothing covered the code. Any script rewritten between runs was therefore
+silently ignored for every step already marked done -- which is the worst possible failure mode for
+a resumable orchestrator, because it looks exactly like a successful run.
+
+`src_guard <marker prefix> <sources...>` fingerprints the sources a family of steps depends on and
+drops those markers when the fingerprint moves. Every family is now covered: the layouts by their
+builder and every feature module, the anchors by their builder, every training step by
+run_models.py, select by select_config/eval_mix/xfit, and each scan by its own script plus xfit.
+Verified on a fixture: an unchanged source keeps the markers, an edited one discards them and says
+so.
+
+## Bootstrap: this does not fix the CURRENT stale state
+src_guard can only compare against a fingerprint it has recorded, and none exists yet, so the first
+run after this change records the fingerprints and discards nothing. The already-stale markers have
+to be cleared once by hand; the command is in the session notes and covers everything downstream of
+layout C -- val_C, build_C, anchor_C, the C grid and family runs, eval_grid_C, analyze_C, select,
+and all six scans. FINAL training then takes care of itself: if select's answer changes, cfg_guard
+discards it; if it does not change, the models are still valid.
+
+One consequence worth stating: if the configuration does NOT change, FINAL training is skipped
+again and no emissions are recorded, because CodeCarbon measures training that actually happens.
+Getting the sustainability number therefore requires at least one configuration to be trained under
+CARBON=1 -- which the config change will force, and which FORCE=1 can force otherwise.
