@@ -1248,3 +1248,55 @@ confounded with calendar month -- layout A's h6 is one specific June with a +0.2
 is the MEASUREMENT. The bound predicts recursion loses; it has not been run on real data to confirm
 that. If the measurement disagrees with the bound, the measurement wins. NOTES and REPORT now say
 so, and REPORT carries it as a [pending] rather than as a settled result.
+
+# Session 9x — the leaderboard settled the diversity question, and a silent under-training
+
+## What the two new submissions settled
+  sub_q_base  pre-session-9 feature set        0.708852   +0.012887 vs best
+  sub_q_alt   31-leaf LightGBM, other capacity 0.698048   +0.002083 vs best
+
+`sub_q_base` confirms the session-9 feature work end to end: the old feature set scores almost
+exactly the old score, so the 0.0129 came from the features and not from seeds, smoothing or luck.
+
+`sub_q_alt` is the interesting one. stack.py fitted the ensemble weights on validation and gave the
+31-leaf model a weight of **0.000** -- validation says it adds nothing. The leaderboard says that
+model, alone, is two thousandths off the best. Two points apart is not "adds nothing"; it is a
+strong, genuinely different model that the fitted weight zeroed out. Validation has been wrong
+about exactly this shape of question before -- it adopted the per-horizon calibration the
+leaderboard then refuted -- so `blend_subs.py` makes the blend directly and spends one submission
+to settle it rather than trusting the fitted zero. Verified to produce an exact weighted average
+and to report the RMS distance to each input, which bounds how far the score can move.
+
+## PRIVATE SLOTS: the current selection is the same bet twice
+`sub_q_main_nocal` (0.695965) and `sub_q_main` (0.696326) are ticked. They differ only by the
+calibration -- 0.00036 apart, essentially the same file. That is not a hedge. The second slot
+should hold something different in KIND, and `sub_q_alt` at 0.698048 is the only competitive
+candidate that qualifies.
+
+## rounds.py: FINAL has probably been under-trained in every run this project has made
+`rd()` took each family's boosting rounds from what early stopping chose on layout A. Layout A's
+history is ~122 months; FINAL trains on ~160, about 30% more data. The number of trees a boosted
+model wants grows with the training set, so FINAL was being given a count fitted to a set a third
+smaller -- and under-training is invisible: there is no validation set for FINAL, nothing errors,
+and the submission looks normal.
+
+The layouts have different history lengths (B ~90 months, C ~120, A ~122), so their early-stopped
+counts are three points on the curve of rounds against training size. rounds.py reads them from the
+orchestrator's own logs, measures each layout's history from the parquet it was built from, fits
+log(rounds) against log(months) and extrapolates to FINAL. It is deliberately conservative: the
+power law is used only with three layouts and a fit explaining more than 60% with an exponent in
+[0,1]; otherwise it falls back to the plain ratio of history lengths. The recommendation is never
+below the incumbent, because the failure being corrected is under-training, and never above 1.6x.
+
+Verified on fixtures: a planted exponent of 0.5 is recovered exactly and gives 1.15x; layouts that
+disagree wildly (300/900/120 rounds) produce an exponent of -5.26, which is rejected in favour of
+the ratio, and the result is still capped.
+
+The round count is now part of cfg_guard's signature, so changing it invalidates the cached FINAL
+models rather than silently reusing models trained for a different number of trees. Verified.
+
+## What this does NOT do
+None of it closes the gap to 0.65. sub_q_base and sub_q_alt bracket the current work at 0.7089 and
+0.6980; the blend and the round correction are each worth thousandths at best. The honest position
+is in REPORT.md section 4: five avenues closed on measurement, and the dominant remaining error is
+large-scale, spatially coherent and temporally white.

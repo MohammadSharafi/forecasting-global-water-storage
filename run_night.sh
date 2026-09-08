@@ -119,6 +119,7 @@ src_guard h1_        run_models.py
 src_guard eval_grid_ eval_mix.py
 src_guard select     select_config.py eval_mix.py xfit.py
 src_guard analyze_   analyze.py
+src_guard roundscan  rounds.py
 src_guard F          run_models.py
 # the scans are cheap and every one of them reads every layout, so they follow the layouts
 src_guard blendscan   blend_scan.py xfit.py
@@ -297,11 +298,19 @@ sys.exit(1 if m else 0)
 EOF" || true
 
 # boosting rounds: whatever early stopping chose for that family on the chosen configuration
+# rounds.py corrects for the fact that FINAL trains on ~30% more history than the layout whose
+# early stopping used to set its round count, so it prefers that recommendation and only falls
+# back to the raw layout-A count when the recommendation is unavailable.
+step roundscan "$PY rounds.py $S > out/rounds.sh" || true
+if [ -s out/rounds.sh ]; then cat "$S/roundscan.log" >> "$R"; . ./out/rounds.sh; fi
+
 rd() {
-  r=$(grep -o 'best_iter=[0-9]*' "$S/cv_A_$1.log" 2>/dev/null | tail -1 | cut -d= -f2)
-  [ -n "$r" ] || case $1 in
-    xgb) r=${XGB_ROUNDS:-400};; cat) r=${CAT_ROUNDS:-1500};; *) r=${LGB_ROUNDS:-300};;
+  case $1 in
+    lgb) r=${LGB_ROUNDS-};; lgbs) r=${LGBS_ROUNDS-};; lgbm) r=${LGBM_ROUNDS-};;
+    xgb) r=${XGB_ROUNDS-};; cat) r=${CAT_ROUNDS-};;   *) r=;;
   esac
+  [ -n "$r" ] || r=$(grep -o 'best_iter=[0-9]*' "$S/cv_A_$1.log" 2>/dev/null | tail -1 | cut -d= -f2)
+  [ -n "$r" ] || case $1 in xgb) r=400;; cat) r=1500;; *) r=300;; esac
   echo "$r"
 }
 H1R=$(grep -o 'best_iter=[0-9]*' "$S/h1_A.log" 2>/dev/null | tail -1 | cut -d= -f2); H1R=${H1R:-$(rd "$FM")}
@@ -316,6 +325,7 @@ say "config: dropf='$FD' weights=$FW hmix='$FH'"
 # markers when it changes.
 cfg_guard() {   # cfg_guard <tag> <dropf> <weights> <hmix> <families...>
   t=$1; sig="dropf=$2 weights=$3 hmix=$4 fams=$(shift 4; echo "$@") seeds=$SEEDS"
+  for m in "$@"; do sig="$sig r_$m=$(rd "$m")"; done
   f="$S/cfg$t.txt"
   if [ -f "$f" ] && [ "$(cat "$f")" != "$sig" ]; then
     n=$(ls "$S"/F${t}_*.done 2>/dev/null | wc -l)
