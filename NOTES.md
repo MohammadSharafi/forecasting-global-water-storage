@@ -1927,3 +1927,24 @@ the profile at p2 is the first thing to do with spare time after the submission 
 
 It is also what killed the FINALe build: `Killed: 9` from the kernel, at roughly 5.4M rows x 328
 columns. At PER_ROW=2 it is about 4.0M x 328, the size that already built successfully for Ae.
+
+# Session 10g — three more hardcoded layout names, found by building a variant matrix
+
+Building `FINALe` beside `FINAL` flushed out the same bug in three separate files, each of which
+had its own idea of what a layout name means:
+
+    add_anchor_feats.py   its own copy of the 'Ap3' -> 'A' regex; died on KeyError 'Ae' AFTER the
+                          21-minute matrix build had succeeded
+    run_models.py         `L != "FINAL"` in two places, so a FINALe matrix was treated as a
+                          validation layout and asked for a `target` column FINAL does not have
+    compliance.py         the same comparison twice, so the audit could not run on the matrix
+                          that produced the submission
+
+All three now import `base_of` from build_mats. The lesson is not "there were three bugs" -- it is
+that a layout name was a convention rather than a definition, and a convention held in four places
+diverges the moment one of them learns something new. `build_mats._LNAME` is now the definition.
+
+Worth noting how each was found, because the failure modes differ sharply: run_models and
+compliance failed loudly and immediately, and cost nothing. add_anchor_feats failed *after* the
+expensive step, and the wrapper's `break` on failure meant two further layouts were silently never
+built. Cheap checks belong before expensive work.
