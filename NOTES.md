@@ -2052,3 +2052,72 @@ gives the clearest read on the direction; the other two bracket it.
 
 The splice pair does the same for the other adopted stage: with beta=0.5 scoring 0.692657, the
 beta=0 and beta=1.0 files turn one gated parameter into three measured points.
+
+# Session 10j — one submission left: what the evidence actually supports
+
+The question was which single file has the best chance of beating 0.692657. Everything below is
+zero-cost: existing predictions, existing public scores, no training.
+
+## Correcting my own reasoning first
+I had argued the board wants MORE smoothing than validation chose, because "removing smoothing costs
+0.0028 on the board, far more than validation valued it". That compared the board's TOTAL smoothing
+effect against the scan's MARGINAL differences. The like-for-like comparison, computed on the exact
+recipe that scored 0.692657:
+
+    removing smoothing entirely   validation +0.00369   board +0.002823   ratio 0.765
+
+The board effect is **smaller** than validation's, not larger. So for this post-processing stage the
+transfer factor is about 0.77 -- nothing like the 2.1x optimism that applies to model changes, and in
+the opposite direction from what I assumed. Every recommendation I had made from that premise was
+wrong, and the measurement says so.
+
+## The smoothing surface, and what the grid never tested
+`smooth_scan`'s `cfg_list` only ever used **radius 1**. `sub_s_smr2` was therefore a guess at an
+untested part of the space, and measuring it costs nothing:
+
+    against the shipped (0.7, 0.7, r1, it1), mean over A/B/C:
+      w 0.85 r1 it1  +0.00005      w 0.7 r1 it2  +0.00011      w 0.6 r1 it2  -0.00004
+      w 0.5  r1 it2  -0.00010      w 0.7 r2 it1  +0.00055      w 0.5 r2 it1  +0.00025
+
+Radius 2 is the worst thing in the table. The one direction that helps is a second pass at a lower
+weight, and only just.
+
+## The splice curve, measured rather than assumed
+    beta      0.00      0.25      0.50      0.75      1.00
+    mean d  +0.00043  +0.00014   0.00000  +0.00002  +0.00020      (positive = worse)
+
+beta=0.50 is at the optimum. This also settles yesterday's confound **without spending the
+submission on it**: removing the splice is worse on all three layouts by +0.00043, about +0.00033 on
+the board, so the splice explains at most an eighth of `sub_r_prof`'s +0.0027. The soil profile cost
+roughly 0.0024 on its own. The avenue is closed on the board's evidence, not on a guess.
+
+## Blending is excluded analytically
+For two scored files the blend's board MSE follows from their scores and the RMS distance between
+them: C = (M1 + M2 - D^2)/2, and the optimal weight on the second model is (M1 - C)/(M1 + M2 - 2C).
+
+    vs sub_r_prof   (0.695366, D 0.0379)   optimal weight  -0.81
+    vs sub_blend73  (0.693283, D 0.0057)   optimal weight -12.98
+
+Both negative: the baseline alone beats any positive-weight blend of it with anything scored. Their
+errors are far too correlated for averaging to buy anything, which is the same lesson the alt-capacity
+blends already paid for.
+
+## The answer
+    file             est board delta   est score   P(new record)
+    sub_t_sm05it2       -0.000073      0.692584        97%
+    sub_s_sm085         +0.000038      0.692695        22%
+    sub_s_smit2         +0.000084      0.692741        20%
+    sub_s_h1full        +0.000153      0.692810         0%
+    sub_s_noh1          +0.000329      0.692986         0%
+    sub_s_smr2          +0.000421      0.693078         0%
+
+`sub_t_sm05it2` is the 0.692657 models with exactly one thing changed -- smoothing (0.7, r1, it1) ->
+(0.5, r1, it2). Validation: -0.000087 on A, -0.000204 on B, +0.000004 on C, i.e. better on two and
+level on the third. RMS distance 0.0114 gives an SE of 0.000039, so the estimated -0.000073 is about
+two standard errors below zero.
+
+Stated honestly: the expected gain is **0.00007**, a record of ~0.69258 rather than 0.692657. It is
+below this project's own 0.0003 adoption threshold, so this is not an adoption -- it is the only
+option on the table with a negative expected delta, and a submission that scores worse cannot lower
+the displayed best score, so the downside is zero. The post-processing surface is flat and there is
+no larger free lever left in it.
