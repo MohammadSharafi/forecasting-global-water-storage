@@ -282,9 +282,12 @@ persistence.
 Emissions are measured **during** the runs that produce the submitted models, not reconstructed
 afterwards: `run_models.py` starts a CodeCarbon tracker around each training run and writes one row
 per run, and `carbon_report.py` totals them and splits validation from final training
-(`out/carbon/summary.md`). Totals for the run behind this submission: **0.1675 kg CO₂e** over
-**185 measured training runs**, 8.48 hours of training and 0.3628 kWh — 176 FINAL runs (8.11 h,
-0.1602 kg) and 9 validation runs (0.37 h, 0.0072 kg), a mean of 0.91 g CO₂e per run. Runs skipped
+(`out/carbon/summary.md`). Totals: **0.2374 kg CO₂e** over **216 measured training runs**, 12.11
+hours of training and 0.5135 kWh — 207 FINAL runs (11.75 h, 0.2302 kg) and 9 validation runs
+(0.37 h, 0.0072 kg), a mean of 1.10 g CO₂e per run. For scale, that is roughly a kilometre and a
+half of driving. The phase split had its own version of the layout-name bug: it matched the literal
+`FINAL`, so the 32 runs that trained the submitted models were counted as validation and the cost of
+the thing being shipped was understated. Runs skipped
 because a checkpoint already existed are not counted, so this is the cost of work actually done. The instrumentation cannot break a training run —
 a missing dependency or a platform that withholds power counters prints one line and continues.
 Efficiency: features are built once and cached as float32 and every model trains from that cache;
@@ -336,4 +339,5 @@ docstring.
 | layout-C repair (zonal features kept, h=1 specialist adopted) + corrected boosting rounds | **0.692657** |
 | 0.7/0.3 blend with a second capacity | 0.693283 |
 | 0.5/0.5 blend with a second capacity | 0.693725 |
-| **final submission** (`out/sub_q_main.csv`) | **0.692657** |
+| **best scored** (`out/sub_q_main.csv`) | **0.692657** |
+| ERA5 soil profile (`out/sub_r_prof.csv`, §3.2b) | *submitted next* — validation says −0.0036, ≈ −0.0017 on the board |

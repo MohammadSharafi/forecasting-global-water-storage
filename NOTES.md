@@ -1948,3 +1948,45 @@ Worth noting how each was found, because the failure modes differ sharply: run_m
 compliance failed loudly and immediately, and cost nothing. add_anchor_feats failed *after* the
 expensive step, and the wrapper's `break` on failure meant two further layouts were silently never
 built. Cheap checks belong before expensive work.
+
+# Session 10h — the submission is built, and the emissions split had the same bug
+
+`out/sub_r_prof.csv`: 16 LightGBM and 16 XGBoost seeds on the FINALe matrix, `DROPF='bigsa,gdo'`
+(297 features), rounds 410/230 unchanged from the file that scored 0.692657, smoothing at the
+incumbent 0.7/r=1/it=1, no seasonal correction, no calibration, and **no horizon-1 splice** because
+hsplice rejected it on this feature set.
+
+Rounds were deliberately NOT re-derived. The counts are the ones that produced 0.692657, so the
+feature set is the only thing that changes between that file and this one -- with the splice, which
+the gate removed, as the unavoidable second difference. The early-stopped counts on the new feature
+set (274/204/337 on the three layouts against 297/182/356 for base) say the profile does not want a
+materially different number of trees, which is the reassurance that mattered.
+
+    file                    rows      IDs   order   finite   RMS vs 0.692657   readable gap
+    sub_r_prof            280961     ok      ok       ok         0.0379          >0.00033
+    sub_r_prof_nosm       280961     ok      ok       ok         0.0806          >0.00069
+    sub_r_prof_lgbonly    280961     ok      ok       ok         0.0416          >0.00036
+
+The expected gain is 0.0017 and the readable threshold for this pair is 0.00033, so whatever the
+board says will be a real signal rather than noise -- in either direction.
+
+## compliance on the matrix that actually produced the file
+Every check passes, and on FINALe rather than on a matrix that resembles it:
+
+    used_FINALe_{lgb,xgb}_v5x_noll_g1.json   297 features, no lat/lon, dropf=['bigsa','gdo']
+    t_known <= t                              min gap 0 months, max 6
+    horizon == months(t_known -> t) + 1       every row
+    tws_known reconstructed independently     max |difference| 1.19e-07 over 280961 rows
+    clim_next from history ALONE              max |difference| 2.98e-08 over 280326 rows
+    external inventory                        111 files, GDO SPI listed, no GRACE product
+
+## A fourth hardcoded layout name, in the sustainability number
+`carbon_report.py` bucketed a run by `layout == "FINAL"`, so the 32 runs that trained the SUBMITTED
+models were filed under validation:
+
+    before   FINAL training 176 runs 8.11 h 0.1602 kg | validation  40 runs 4.00 h 0.0772 kg
+    after    FINAL training 207 runs 11.75 h 0.2302 kg | validation  9 runs 0.37 h 0.0072 kg
+
+The total was right either way; the split -- which is the part a reviewer reads, because it says
+what the shipped artefact cost -- was wrong. Same family as add_anchor_feats, run_models and
+compliance, and the fourth place a layout name was a convention rather than a definition.

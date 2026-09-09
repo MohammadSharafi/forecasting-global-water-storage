@@ -31,7 +31,10 @@ def main():
     # project_name is LAYOUT_MODEL_FEATSET[TAG]_sSEED
     d = d.with_columns(pl.col("project_name").str.split("_").list.first().alias("layout"))
     d = d.with_columns(
-        pl.when(pl.col("layout") == "FINAL").then(pl.lit("FINAL training"))
+        # A layout may carry its variant in its name -- 'FINALe' is a FINAL matrix built with the
+        # soil profile -- so matching the literal "FINAL" put 32 runs that trained the submitted
+        # models into the validation bucket, understating the cost of the thing being submitted.
+        pl.when(pl.col("layout").str.starts_with("FINAL")).then(pl.lit("FINAL training"))
           .otherwise(pl.lit("validation")).alias("phase"))
     tot = float(d["emissions"].sum())
     hrs = float(d["duration"].sum()) / 3600.0
