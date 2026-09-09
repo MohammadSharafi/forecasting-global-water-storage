@@ -1990,3 +1990,43 @@ models were filed under validation:
 The total was right either way; the split -- which is the part a reviewer reads, because it says
 what the shipped artefact cost -- was wrong. Same family as add_anchor_feats, run_models and
 compliance, and the fourth place a layout name was a convention rather than a definition.
+
+# Session 10i — the leaderboard refutes the soil profile, and the file changed two things
+
+    sub_r_prof   0.695366   against the best 0.692657   +0.002709 WORSE
+
+Validation said -0.0036 on all three layouts, which at the 2.1x optimism factor predicted about
+-0.0017 on the board. The board says +0.0027, in the opposite direction and larger. Under this
+project's own standing rule the board wins and the profile is not adopted.
+
+## The confound, and the free experiment that settles it
+`sub_r_prof` differs from the 0.692657 file in TWO ways, not one:
+
+  * the ERA5 soil profile: 261 -> 297 features
+  * NO horizon-1 splice, because hsplice re-gated on the new feature set rejected it, where the
+    0.692657 file spliced a specialist at beta=0.50 over 94,048 rows
+
+Removing the splice was the correct call by the gate and it was flagged at the time as the
+unavoidable second difference. It can be separated at ZERO training cost, because the old FINAL
+predictions, their h=1 specialists and the old matrix are all still on disk: `sub_s_noh1.csv` is the
+0.692657 models assembled WITHOUT the splice, differing from that file in nothing else. RMS distance
+0.0159, so a gap above 0.00014 is readable.
+
+    sub_s_noh1 scores ~0.6927  ->  the splice is worth nothing on the board, and the soil profile
+                                   genuinely costs 0.0027. Revert; the avenue is closed.
+    sub_s_noh1 scores ~0.6953  ->  the splice is worth ~0.0027, the profile is roughly neutral, and
+                                   profile + splice is the file to build.
+
+Validation's own numbers argue for the first: hsplice measured the splice at -0.00046/-0.00060/
+-0.00031 held out, which at 2.1x optimism is worth about 0.0002 on the board, not 0.0027. If the
+splice turns out to be worth ten times what validation measured, that is a second finding and a
+larger one than the profile.
+
+## What this costs the earlier claim
+Nothing in section 3.2b's measurement was wrong: four arms on one matrix, two seeds, every layout,
+8-17x the threshold. What it shows is that this project's validation-to-leaderboard transfer is not
+merely optimistic by a factor -- it can invert sign. That has now happened twice: the per-horizon
+calibration was adopted by held-out validation and cost 0.00036 on the board, and the soil profile
+was adopted by every layout and cost 0.0027. Both times the change added parameters or features
+fitted on 2009-2015 layouts and was asked to work on a 2015-2019 test that includes the GRACE /
+GRACE-FO transition.
