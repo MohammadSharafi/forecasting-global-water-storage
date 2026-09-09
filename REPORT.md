@@ -97,6 +97,35 @@ synthetic data where the answer is known — with a true correlation of 0.844, t
 pooled across cells on raw totals. The conclusion that closed this avenue for four sessions rested
 on an encoding artifact, not on the data.
 
+### 3.2b The second finding: every soil product was throwing its profile away
+
+`features_era5` collapsed ERA5's four `swvl` layers into one column by a fixed-thickness weighted
+sum; `features_ncep` and `features_x` do the same to NCEP-R1's and R2's two layers. Across 266
+features the shallow and deep soil stores appeared **nowhere** as separate quantities. What that
+removes is the drainage timescale — a 7 cm top layer answers a month of rain, a 189 cm bottom layer
+integrates seasons, and TWS is the integral of the contrast between them.
+
+Keeping ERA5's four layers apart, each in metres of water so they still sum to the old column, and
+passing them through the same per-cell standardisation as every other storage variable:
+
+| arm | features | layout A | layout B | layout C | mean |
+|---|---|---|---|---|---|
+| incumbent | 261 | 0.6402 | 0.5364 | 0.5288 | — |
+| + soil profile | 297 | **0.6378** | **0.5313** | **0.5256** | **−0.0036** |
+| + profile + GDO SPI | 309 | 0.6376 | 0.5318 | 0.5248 | −0.0037 |
+
+All four arms were trained on **one matrix**, so the only difference between them is which features
+the model was offered. The profile wins on every layout by 8 to 17 times the adoption threshold —
+second only to the covariate-anomaly encoding in this project's history — and at six of seven
+horizons on A, five on B and all seven on C.
+
+Copernicus GDO's long-window SPI (24 and 48 months, GPCC-based, §5) was measured in the same run and
+**not adopted**: its marginal value on top of the profile is −0.0002, +0.0005, −0.0008, so it loses
+on one layout and its mean is inside seed noise. The likely reason is visible in the arithmetic — a
+100–289 cm soil layer is the physical accumulator of exactly the long-window precipitation deficit
+that SPI-48 indexes, so the profile carries the same information closer to the target and per cell
+rather than as a basin-scale index.
+
 ### 3.3 Model and post-processing
 
 Each model predicts the **residual** `TWS(t+1) − TWS(last observed)`. The ensemble weight is fitted

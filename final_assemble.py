@@ -28,7 +28,10 @@ import polars as pl, numpy as np, sys, glob, re, os
 from smooth import smooth_field, horizon_w
 
 out = sys.argv[1]; spec = [a.split(":") for a in sys.argv[2:]]
-va = pl.read_parquet("out/mats/FINAL_va.parquet",
+# FLAYOUT names the FINAL matrix to assemble from. 'FINALe' is the soil-profile build, which is
+# written beside FINAL rather than over it so a scored submission can always be rebuilt.
+FL = os.environ.get("FLAYOUT", "FINAL")
+va = pl.read_parquet(f"out/mats/{FL}_va.parquet",
                      columns=["ID", "lat", "lon", "time", "t_known", "horizon", "tws_known"])
 k = va["tws_known"].to_numpy(); h = va["horizon"].to_numpy()
 
@@ -36,8 +39,8 @@ k = va["tws_known"].to_numpy(); h = va["horizon"].to_numpy()
 def avg(name, tag):
     """Mean over the seed files for one stem. Exact matches only: a bare tag must not pick up
     pred_..._s0_h1.npy, which is a different model."""
-    pat = re.compile(rf"pred_FINAL_{re.escape(name)}_s\d+{re.escape(tag)}\.npy")
-    fs = sorted(f for f in glob.glob(f"out/mats/pred_FINAL_{name}_s*{tag}.npy")
+    pat = re.compile(rf"pred_{re.escape(FL)}_{re.escape(name)}_s\d+{re.escape(tag)}\.npy")
+    fs = sorted(f for f in glob.glob(f"out/mats/pred_{FL}_{name}_s*{tag}.npy")
                 if pat.fullmatch(os.path.basename(f)))
     assert fs, f"no prediction files for {name!r} (tag {tag!r})"
     return np.mean([np.load(f) for f in fs], 0), len(fs)

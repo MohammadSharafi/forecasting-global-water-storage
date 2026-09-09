@@ -1829,3 +1829,54 @@ being run.
 Six matched pairs, 432 s of control against 323 s. That is real and it is free, since accuracy is
 unchanged, and it applies to every specialist run. Recorded under §6.4 rather than as an accuracy
 change, and left OFF by default so the submitted configuration is the one that was gated.
+
+# Session 10f — the soil profile is the first real feature win since the anomaly encoding
+
+## Every soil product in this pipeline was throwing its profile away
+
+`features_era5.load_era5` collapsed ERA5's four `swvl` layers into one column by a fixed-thickness
+weighted sum. `features_ncep` does the same to NCEP-R1's 0-10cm and 10-200cm, and `features_x` to
+NCEP-R2's. So the shallow and deep stores appeared **nowhere** in 266 features as separate
+quantities -- three products, three collapses, and the same information destroyed each time.
+
+What that costs is the drainage timescale. The 7 cm top layer answers a month of rain; the 189 cm
+bottom layer integrates seasons; their contrast is recharge against depletion, and TWS is the
+integral of exactly that. A fixed-weight sum is the one operation guaranteed to remove it.
+
+`load_era5(prof=True)` keeps `e5SW1..e5SW4` as separate storage variables, each in metres of water
+so they still sum to `e5SW` by construction. They go through `features_anom` like every other
+storage variable, which is the per-cell standardisation that produced this project's only large
+gain -- a raw soil-water level is unusable to a model with no location features.
+
+## The measurement
+
+Four arms on ONE matrix, so the only difference between them is which features the model is
+offered. Two seeds each, scored under the real test horizon mix.
+
+    arm                                     Ae       Be       Ce    mean delta   every layout?
+    base   incumbent, 261 features      0.6402   0.5364   0.5288    +0.0000      --
+    prof   + soil profile, 297          0.6378   0.5313   0.5256    -0.0036      YES
+    both   + profile + GDO SPI, 309     0.6376   0.5318   0.5248    -0.0037      YES
+
+    marginal value of GDO on top of the profile:   Ae -0.0002   Be +0.0005   Ce -0.0008
+
+**The profile is adopted.** It wins on all three layouts by 8 to 17 times the 0.0003 threshold,
+which puts it second only to the covariate-anomaly encoding (-0.0128/-0.0184) in this project's
+history, and it wins at six of seven horizons on A, five of seven on B and all seven on C.
+
+**GDO is not adopted on top of it.** `both` also clears the every-layout rule against base, but the
+question for a feature family is its MARGINAL value over what is already adopted, and there GDO is
+-0.0002, +0.0005, -0.0008 -- it loses on B and the mean is inside seed noise. Two arms that cannot
+be told apart are decided by the simpler one: 297 features, not 309.
+
+That is not a wasted download. It is a measured answer to a real question, and the likely reason is
+visible in the numbers: SPI-24 and SPI-48 are long-window *precipitation* deficits, and a deep soil
+layer at 100-289 cm is the physical accumulator of exactly those deficits. The profile appears to be
+carrying the same information closer to the target, and it carries it per cell rather than as a
+basin-scale index.
+
+## Honest scale
+Validation runs about 2.1x optimistic here, so -0.0036 on validation is worth roughly -0.0017 on
+the board: 0.6927 -> about 0.691. Real, gated, and reproducible -- and not remotely enough to reach
+the 0.6495 cluster. The gap to that cluster is 0.043, and nothing measured in this project has ever
+been worth a tenth of it except the anomaly encoding.
