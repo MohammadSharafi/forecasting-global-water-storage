@@ -39,8 +39,12 @@ def base_of(L):
 
 
 def prof_of(L):
-    """True when this layout wants the ERA5 soil layers kept apart instead of summed."""
-    return _parse(L)[2] is not None
+    """True when this layout wants the ERA5 soil layers kept apart instead of summed.
+
+    The name suffix is how the A/B ablation builds its own matrices beside the cached ones
+    ('Ae' against 'A'). PROF=1 is how the orchestrator turns the winner on for every layout
+    once it has been gated, without renaming anything it already checkpoints."""
+    return _parse(L)[2] is not None or os.environ.get("PROF", "") == "1"
 
 
 def per_row_of(L, default=None):

@@ -109,7 +109,7 @@ step diag_shift_B   "$PY globalshift.py B lgb_v5x_noll" || true
 # ---------------------------------------------------------------- 2. rebuild with every feature
 # Everything a step's result depends on, so a rewritten script can never be skipped again.
 src_guard val_C      validation_c.py
-printf 'PER_ROW=%s' "${PER_ROW:-2}" > "$S/perrow.txt"   # a different PER_ROW is a different matrix
+printf 'PER_ROW=%s PROF=%s' "${PER_ROW:-2}" "${PROF:-0}" > "$S/perrow.txt"   # a different PER_ROW or soil-profile setting is a different matrix
 # The external covariates are an input to the matrix exactly as the feature code is. Downloading
 # ERA5 or GDO changes no source file, so without this the cached matrices would be reused and the
 # new data would silently never reach a model.
