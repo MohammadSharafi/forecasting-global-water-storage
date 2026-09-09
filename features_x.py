@@ -73,6 +73,39 @@ def add_wide4(r, radius=4):
     return r.with_columns([pl.Series(k,v) for k,v in out.items()])
 WIDE4=["w4_"+k for k in WKEYS]+["w4_n"]
 
+# The covariate ANOMALY block existed only at 1 degree, and that is the one scale where it is
+# least trustworthy and where our error is not. Measured on layout A: the correlation between the
+# accumulated water-balance anomaly and the actual TWS change rises from 0.177 at the cell to
+# 0.242 over a 9x9 box, because reanalysis P-E-R errors are largely independent between cells and
+# average out, while the TWS signal is coherent (blurring the TRUE target over its 8 neighbours
+# costs only 0.062). 98.2% of this model's error variance is shared with the neighbours, so the
+# scale that matters is the regional one -- and no aggregate of an_* existed at all.
+ANWKEYS = ["an_e5PERz_acc", "an_e5Pz_acc", "an_e5Ez_acc", "an_e5PERz_w3", "an_e5PERz_w6",
+           "an_e5SWz_d", "an_e5MTWSz_d", "an_PERz_acc", "an_SWz_d", "an_MTWSz_d",
+           "an_SOIL_MOISTURE_tz_d"]
+
+
+def add_anwide(r, radius=4, keys=None):
+    """Neighbourhood means of the covariate-anomaly block, same machinery as add_wide4."""
+    from scipy.ndimage import uniform_filter
+    keys = [k for k in (keys or ANWKEYS) if k in r.columns]
+    if not keys:
+        return r, []
+    pairs=r.select(["time","t_known"]).unique().sort(["time","t_known"]).with_row_index("pid")
+    rr=r.join(pairs,on=["time","t_known"],how="left")
+    pid=rr["pid"].to_numpy(); li=(rr["lat"].to_numpy()+89.5).round().astype(int); lo=(rr["lon"].to_numpy()+179.5).round().astype(int)
+    n=len(pairs); size=(1,2*radius+1,2*radius+1); k2=size[1]*size[2]
+    out={}
+    for k in keys:
+        v=rr[k].to_numpy().astype(np.float32); ok=~np.isnan(v)
+        arr=np.zeros((n,180,360),np.float32); arr[pid[ok],li[ok],lo[ok]]=v[ok]
+        c=np.zeros((n,180,360),np.float32); c[pid[ok],li[ok],lo[ok]]=1.0
+        S=uniform_filter(arr,size=size,mode=("constant","constant","wrap"))*k2
+        Cc=uniform_filter(c,size=size,mode=("constant","constant","wrap"))*k2
+        m=np.where(Cc>0.5,S/np.maximum(Cc,1e-6),np.nan)
+        out["aw_"+k]=m[pid,li,lo]
+    return r.with_columns([pl.Series(k,v) for k,v in out.items()]), list(out)
+
 def add_covwin(r, cov_all):
     """window stats of covariates over (t_known, t] and covariate lags relative to t."""
     win=cov_all.select(["lat","lon","time","SPEI_01_t","SPEI_03_t","SPEI_06_t","SOIL_MOISTURE_t"]).rename({"time":"tw"})

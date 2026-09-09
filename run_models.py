@@ -42,7 +42,7 @@ def _carbon_stop():
         print(f"  carbon: {kg:.6g} kg CO2e for this run",flush=True)
     except Exception as e:
         print(f"  carbon: stop failed ({type(e).__name__})",flush=True)
-ALL=json.load(open("out/mats/feats.json"))
+ALL=json.load(open((f"out/mats/feats_{L}.json" if os.path.exists(f"out/mats/feats_{L}.json") else "out/mats/feats.json")))
 F6=[f for f in FEATS2+AR+WIDE+RECENT if f not in LONGTERM]
 NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
 NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
@@ -75,6 +75,7 @@ DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "anwide" in DROPF:    F=[f for f in F if not f.startswith("aw_")]
 if "r2anom" in DROPF:   F=[f for f in F if not f.startswith("an_r2")]
 if "cpcanom" in DROPF:  F=[f for f in F if not f.startswith("an_cpc")]
 if "speianom" in DROPF: F=[f for f in F if not f.startswith("an_SPEI")]

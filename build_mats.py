@@ -14,7 +14,7 @@ from features6 import add_recent, RECENT, LONGTERM
 from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, era5_feats
-from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
+from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP, add_anwide
 from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE, NCEP2_STORAGE, NCEP2_FLUX, CPC_STORAGE, SPEI_STORAGE
 from features_scale import add_scale, SCALE
 from features_gdo import load_gdo
@@ -126,7 +126,9 @@ def prepare(L, t0=None):
         for at, sz, fz in ANOM:   # are raw mm and unusable without lat/lon, which is not a feature
             r, f = add_anom(r, at, sz, fz); AF += f
             r, f = add_anom_windows(r, at, fz, sz); AF += f   # 3/6/12-month antecedent windows ending at t
-        F = FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF+SCALE
+        # regional means of the covariate-anomaly block: the scale our error actually lives at
+        r, AW = add_anwide(r, radius=int(os.environ.get("ANWIDE_R", "4")))
+        F = FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF+SCALE+AW
         F = list(dict.fromkeys(F)); return r, F
 
     return dict(tr=tr, cov_all=cov_all, obs_all=obs_all, obs_hist=obs_hist, hist=hist,
@@ -142,6 +144,11 @@ def main():
     del Xva; gc.collect()
     Xtr, _ = S["featfn"](training_rows_coherent(S["hist"], np.random.default_rng(11 if base_of(L) == "FINAL" else 0), per_row=per_row_of(L)), S["obs_hist"], True)
     Xtr.select(list(dict.fromkeys(["lat", "lon", "time", "t_known", "horizon", "tws_known", "target"]+F))).with_columns([pl.col(f).cast(pl.Float32) for f in F]).write_parquet(f"out/mats/{L}_tr.parquet")
+    # Per-layout, because feats.json is read by run_models at TRAIN time: a build of one layout
+    # was overwriting the feature list another layout's training run depended on, which is how a
+    # run of layout A died mid-experiment tonight. The shared file is still written for anything
+    # that reads it, but the layout-specific one wins.
+    json.dump(F, open(f"out/mats/feats_{L}.json", "w"))
     json.dump(F, open("out/mats/feats.json", "w")); print("tr", Xtr.shape, "nfeat", len(F), f"({time.time()-t0:.0f}s)", flush=True)
 
 

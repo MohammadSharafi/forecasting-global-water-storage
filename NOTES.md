@@ -2329,3 +2329,45 @@ Closing 0.043 on the board would mean explaining roughly another 13% of target v
 measured in this project comes within an order of magnitude of that, and the four structural classes
 that could have -- spatial modelling, post-processing, representation, regime adaptation -- are now
 each closed by measurement rather than by argument.
+
+# Session 10o — the covariate anomalies existed only at 1 degree, and that is the wrong scale
+
+## The reasoning that found it
+Three measurements from session 10n, taken together, say where to look:
+
+  * blur the TRUE target over its 8 neighbours and it scores 0.0619 -- the signal is coherent;
+  * blur OUR ERROR the same way and 98.2% of its variance survives -- the error is regional;
+  * the accumulated water-balance anomaly correlates 0.177 with the TWS change at the cell, and
+    **0.242 over a 9x9 box** -- reanalysis P-E-R errors are largely independent between cells and
+    average out, while the TWS signal does not.
+
+So the one quantity that physically drives TWS change is most trustworthy exactly at the scale our
+error lives at. And `feats.json` had **no aggregate of the `an_*` block at all**: the 25 wide and
+neighbourhood features cover TWS-derived quantities and the released SPEI and soil moisture, and
+stop there. The water-balance anomaly existed only at 1 degree, the one scale where it is noisiest.
+
+## add_anwide
+Neighbourhood means (radius 4, a 9x9 box) of eleven anomaly columns -- the ERA5 and NCEP
+accumulated water balance, its 3- and 6-month windows, the storage differences and the released
+soil-moisture anomaly -- through the same convolution machinery as `add_wide4`. `DROPF=anwide`
+ablates exactly the block.
+
+## First result, layout B
+    base (no regional anomaly means)   0.5331
+    with add_anwide                    0.5259     -0.0072
+
+    per horizon  h1 -0.0039  h2 -0.0053  h3 -0.0123  h4 -0.0044  h5 -0.0268  h6 -0.0088  h7 -0.0012
+
+Better at **all seven horizons**, and -0.0072 is 3.3x the NCEP-R2/CPC fix and above the 0.003 line
+that tonight's transfer analysis set. It is the largest validated gain since the covariate-anomaly
+encoding itself, and it is the same KIND of finding: a feature family that existed but could not be
+read, this time because it was offered at the wrong spatial scale rather than in the wrong units.
+
+Layouts A and C are building now. The FINALvn run was paused to give them the machine -- its
+predictions are on disk and it resumes where it stopped.
+
+## feats.json was a shared mutable, and it had already broken one run
+`build_mats` wrote one `out/mats/feats.json` that `run_models` reads at TRAIN time, so building any
+layout silently redefined the feature list every other layout's training depended on. That is what
+killed the first analogue-weighting attempt tonight. Builds now write `feats_<layout>.json` and
+run_models prefers it.
