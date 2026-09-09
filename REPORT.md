@@ -225,8 +225,13 @@ Every rule clarification issued by the organisers was applied, including ones th
   climatology, rather than a reading of the code. An earlier version smoothed each prediction along
   the horizon within a block, which indirectly used covariates at t+1; it was removed even though
   the causal replacement scores worse, because the gain came entirely from the non-causal direction.
-- **No GRACE or GRACE-derived product** of any kind. `external/` is inventoried in the audit output;
-  it holds NCEP reanalysis and a climate index only.
+- **No GRACE or GRACE-derived product** of any kind. `external/` is inventoried in the audit
+  output; it holds NCEP-R1 and R2 reanalysis, CPC soil moisture, ERA5 monthly means, the ONI index
+  and Copernicus GDO's GPCC-based SPI-24 and SPI-48. The GDO catalogue publishes a
+  `GDO_GRACE_Total_Water_Storage_Anomaly` layer in the same directory listing as the SPI products
+  that were downloaded; it was **not** taken, and neither were GDO's seasonal forecasts, for the
+  reason in the last bullet of this section. Every retrieval is recorded with its URL, version
+  directory, file naming and date in `GDO_SETUP.md` and `ERA5_SETUP.md`.
 - **Neighbouring cells' TWS at months ≤ t** is permitted including spatial filtering, which the
   smoothed anchors and the grid smoothing rely on.
 - **Seasonal forecasts are deliberately not used.** A forecast issued in month t has a source date
@@ -292,10 +297,24 @@ Python 3.10; polars, LightGBM, XGBoost, CatBoost, xarray, scipy, codecarbon.
 
 ```
 python validation.py ; python validation_b.py ; python validation_c.py   # the three layouts
-python build_mats.py A|B|C|FINAL                                          # cached feature matrices
+PER_ROW=2 python build_mats.py A|B|C|FINAL                                # cached feature matrices
 python add_anchor_feats.py A|B|C|FINAL                                    # smoothed-anchor features
 python run_models.py FINAL {lgb|lgbs|lgbm|xgb|cat} v5x_noll_sa [rounds]   # one seed
 python final_assemble.py <name> <stem:weight> ...                         # the submitted CSV
+```
+
+A layout may carry its variant in its **name**, so an experiment that changes every matrix builds
+beside the cached ones instead of over them: `Ap3` is layout A at `PER_ROW=3`, `Ae` and `FINALe` are
+built with the ERA5 soil profile of §3.2b. `PROF=1` turns the profile on for every layout once it
+has been gated, and it is part of the build fingerprint, so flipping it invalidates the cached
+matrices rather than mixing a profile decision with non-profile matrices. `PER_ROW` must be passed
+explicitly — `build_mats` defaults it to 3 while everything shipped is built at 2.
+
+```
+PROF=1 PER_ROW=2 python build_mats.py FINALe      # the §3.2b feature set
+DROPF=e5prof python run_models.py ...             # ablate the soil profile alone
+DROPF=gdo    python run_models.py ...             # ablate the GDO block alone
+FLAYOUT=FINALe python final_assemble.py ...       # assemble from the profile matrix
 ```
 
 `./run_night.sh` runs all of it end to end, resumably, and writes `out/RUN_REPORT.md` containing the

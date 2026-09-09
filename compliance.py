@@ -36,7 +36,9 @@ import sys
 import numpy as np
 import polars as pl
 
+from build_mats import base_of as layout_base   # one parser: FINALe is a FINAL matrix
 L = sys.argv[1] if len(sys.argv) > 1 else "FINAL"
+LB = layout_base(L)
 FAIL = []
 
 
@@ -98,7 +100,7 @@ def main():
 
     tr = pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
     obs = tr.select(["lat", "lon", "time", "TWS_t"])
-    if L == "FINAL" and os.path.exists("Test.csv"):
+    if LB == "FINAL" and os.path.exists("Test.csv"):
         te = pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
         if "TWS_t_masked" in te.columns:
             obs = pl.concat([obs, te.filter(~pl.col("TWS_t_masked"))
@@ -113,9 +115,9 @@ def main():
     if "clim_next" in va.columns:
         # recompute the target-month climatology from Train.csv ALONE. If the matrix column
         # matches, no test-era observation entered it.
-        hist = tr if L == "FINAL" else pl.read_parquet(
+        hist = tr if LB == "FINAL" else pl.read_parquet(
             {"A": "out/pseudo_hist.parquet", "B": "out/pseudo_hist_B.parquet",
-             "C": "out/pseudo_hist_C.parquet"}[L])
+             "C": "out/pseudo_hist_C.parquet"}[LB])
         cl = (hist.with_columns(pl.col("time").dt.month().alias("m"))
                   .group_by(["lat", "lon", "m"]).agg(pl.col("TWS_t").mean().alias("ref")))
         s = (va.with_columns(((pl.col("time").dt.month() % 12) + 1).alias("m"))
