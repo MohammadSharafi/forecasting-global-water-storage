@@ -2168,3 +2168,54 @@ Post-processing is finished. Every remaining lever in it -- smoothing weight, ra
 splice weight, calibration, seasonal offsets -- moves validation by less than 0.001, which is inside
 the range where validation has never predicted the board's sign. Continuing to spend submissions
 there is not optimisation, it is sampling noise at one file per day.
+
+# Session 10l — the raw-level bug was still in two products, and fixing it is the best lead left
+
+## The bug, measured before it was fixed
+`build_mats` passed four tables to `anom_build`: ERA5, NCEP-R1, the released soil moisture, and GDO.
+`nc2` (NCEP-R2) and `cpc` (CPC soil moisture) were never in that list, so their 24 features have been
+raw millimetres and volumetric fractions since session 8 -- the exact encoding that cost this project
+four sessions and was worth -0.0155 on validation when it was fixed for ERA5.
+
+The diagnostic is the ratio sd(per-cell mean) / sd(overall). A feature the model can use is small;
+a raw level whose between-cell variation swamps its within-cell signal is near 1, and with lat/lon
+excluded the model cannot recover the difference:
+
+    r2SWE_t  1.007   r2SW_k  0.948   cpcSW_k  0.939   cpcSW_t  0.927   r2E_t  0.774
+    an_e5Pz_t 0.281  an_Pz_t 0.360                                  <- encoded, for contrast
+
+None of the 24 appears in any top-gain list, which is the same signature the ERA5 block had before
+the fix: a feature carrying real information that the model cannot read.
+
+## The measurement
+Four arms on one matrix per layout, two seeds, test horizon mix:
+
+    arm                          A        B        C     mean d   every layout?
+    base (incumbent)        0.6393   0.5350   0.5313    +0.0000    --
+    + NCEP-R2 + CPC         0.6380   0.5334   0.5285    -0.0019    YES
+    + SPEI                  0.6382   0.5345   0.5318    -0.0004    no, loses on C
+    all three               0.6377   0.5332   0.5280    -0.0022    YES
+
+The bug fix carries it. SPEI fails exactly where its weaker evidence predicted -- it is standardised
+in the large (per-cell sd 0.93) and only its per-cell seasonal bias was left to remove; its marginal
+contribution over the fix is -0.0003, consistent in sign but at the threshold.
+
+## Honest position on whether to submit it
+-0.0022 does NOT meet the 0.003 bar that tonight's transfer analysis set, and three of three changes
+in this magnitude band have inverted on the board. Two things argue the other way, and they should
+be weighed rather than waved:
+
+  * it wins on all three layouts, by 4 to 9 times the old adoption threshold, and it is the largest
+    validated feature gain since the covariate-anomaly encoding itself;
+  * it is a **bug fix**, and category has predicted transfer better than magnitude has. The two
+    changes that ever transferred were a representation fix (-0.0156) and a variance reduction
+    (+0.0037). The three that inverted all either added features or fitted parameters on validation.
+    This is the same kind of change as the one that worked. That argument rests on n=2 and should
+    not be oversold.
+
+At 0.77x it would be about -0.0017 on the board, a record of ~0.6910. Inverted it would be ~0.6944,
+which costs nothing: a worse submission cannot lower the displayed best score.
+
+FINAL is training overnight on `FINALvn` with `DROPF='bigsa,gdo'`, rounds 410/230 and the h=1 splice
+at beta=0.50 -- every setting identical to the file that scored 0.692657, so the feature encoding is
+the only thing that differs. `out/scored/sub_q_main.csv` is untouched.

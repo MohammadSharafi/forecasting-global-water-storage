@@ -10,7 +10,7 @@ cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
 # builds a third more training rows than the configuration being shipped, and on this
 # machine that is also the difference between a build that finishes and one the kernel kills.
 export PER_ROW=${PER_ROW:-2}
-FD=${1:-bigsa}; L=FINALe; TAG=_g1; SEEDS=${SEEDS:-16}
+FD=${1:-bigsa}; L=${FL:-FINALe}; TAG=${TAG:-_g1}; SEEDS=${SEEDS:-16}
 LGBR=${LGBR:-410}; XGBR=${XGBR:-230}; H1R=${H1R:-353}; HB=${HB:-0}; OUT=${OUT:-sub_r_prof}
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 
@@ -25,9 +25,10 @@ if [ ! -f out/mats/${L}_tr_anchor.parquet ]; then
 fi
 
 # the 261-feature FINAL carried 201 of them; check the new matrix really has the new families
-$PY - <<'PY'
+FLCHK=$L $PY - <<'PY'
 import polars as pl
-c = pl.scan_parquet("out/mats/FINALe_va.parquet").collect_schema().names()
+import os
+c = pl.scan_parquet(f"out/mats/{os.environ['FLCHK']}_va.parquet").collect_schema().names()
 prof = [x for x in c if x.startswith(("e5SW1","e5SW2","e5SW3","e5SW4","an_e5SW1","an_e5SW2","an_e5SW3","an_e5SW4"))]
 gdo  = [x for x in c if x.startswith(("an_spi24","an_spi48"))]
 print(f"  FINALe: {len(c)} columns, {len(prof)} soil-profile, {len(gdo)} GDO")
