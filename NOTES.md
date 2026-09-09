@@ -2030,3 +2030,25 @@ calibration was adopted by held-out validation and cost 0.00036 on the board, an
 was adopted by every layout and cost 0.0027. Both times the change added parameters or features
 fitted on 2009-2015 layouts and was asked to work on a 2015-2019 test that includes the GRACE /
 GRACE-FO transition.
+
+## Five free candidates, from the models that already scored 0.692657
+
+No training. Every one of them changes exactly one thing about the file that scored 0.692657, and
+each is a real question the board can answer.
+
+    file             RMS vs best   readable gap   what it changes
+    sub_s_noh1          0.0159       >0.00014     the h=1 splice, beta 0.50 -> 0
+    sub_s_h1full        0.0159       >0.00014     the h=1 splice, beta 0.50 -> 1.0
+    sub_s_sm085         0.0145       >0.00012     smoothing weight 0.7 -> 0.85
+    sub_s_smit2         0.0291       >0.00025     smoothing iterations 1 -> 2
+    sub_s_smr2          0.0462       >0.00040     smoothing radius 1 -> 2
+
+The smoothing three are motivated by a disagreement the board has already stated. `smooth_scan`
+chose (0.7, r=1, it=1) on validation, and the board then said that removing smoothing altogether
+costs **0.0028** -- far more than validation valued it. If the board weights spatial smoothing more
+heavily than validation does, the board's optimum may lie beyond the setting validation picked, and
+nothing in this project has ever tested that. `sub_s_smr2` is the strongest of the three, so it
+gives the clearest read on the direction; the other two bracket it.
+
+The splice pair does the same for the other adopted stage: with beta=0.5 scoring 0.692657, the
+beta=0 and beta=1.0 files turn one gated parameter into three measured points.
