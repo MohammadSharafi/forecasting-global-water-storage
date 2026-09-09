@@ -3,6 +3,7 @@ Training rows use history-only observations; evaluation rows use the observation
 prediction time (history + test rows whose TWS_t is not masked), exactly as build_mats.py does."""
 import polars as pl, numpy as np, sys, time, os
 from anchor import anchor_fields, sample
+from build_mats import base_of   # one parser for layout names: 'Ap3' and 'Ae' are both layout A
 L=sys.argv[1]; t0=time.time()
 # 1500/2500 km give the CONTINENTAL scale. Session 3 measured that this test period's
 # unpredictable component is regional and spatially coherent, and nothing else in the feature
@@ -10,13 +11,12 @@ L=sys.argv[1]; t0=time.time()
 # latitude ring, which at 45N mixes Oregon, Iowa, France, Kazakhstan and Mongolia.
 RAD=tuple(int(x) for x in os.environ.get("ANCHOR_RADII","300,500,800,1500,2500").split(","))
 tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
-if L=="FINAL":
+if base_of(L)=="FINAL":
     te=pl.read_csv("Test.csv").with_columns(pl.col("time").str.to_date())
     obs_hist=tr.select(["lat","lon","time","TWS_t"])
     obs_eval=pl.concat([obs_hist, te.filter(~pl.col("TWS_t_masked")).select(["lat","lon","time","TWS_t"])])
 else:
-    import re as _re
-    sfx={"A":"","B":"_B","C":"_C"}[(_re.fullmatch(r"([ABC])p\d+",L).group(1) if _re.fullmatch(r"([ABC])p\d+",L) else L)]; tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
+    sfx={"A":"","B":"_B","C":"_C"}[base_of(L)]; tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
     obs_hist=hist.select(["lat","lon","time","TWS_t"])
     obs_eval=pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat","lon","time","TWS_t"])])
 for part,obs in (("tr",obs_hist),("va",obs_eval)):
