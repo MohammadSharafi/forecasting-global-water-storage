@@ -2371,3 +2371,32 @@ predictions are on disk and it resumes where it stopped.
 layout silently redefined the feature list every other layout's training depended on. That is what
 killed the first analogue-weighting attempt tonight. Builds now write `feats_<layout>.json` and
 run_models prefers it.
+
+## Confirmed on all three layouts
+
+    layout      base   + regional anomaly means      delta
+    A         0.6383                    0.6343     -0.00400
+    B         0.5331                    0.5259     -0.00720
+    C         0.5279                    0.5183     -0.00960
+    mean                                           -0.00693     worst layout -0.00400
+
+This is the **first change since the covariate-anomaly encoding to clear 0.003 on every layout**,
+and it is measured as the marginal value ON TOP of the NCEP-R2/CPC fix, so the two add:
+
+    NCEP-R2 + CPC + SPEI encoding      -0.0022
+    regional means of the an_* block   -0.0069
+    together, against the shipped configuration   about -0.0091 on validation
+
+At the 0.77-0.83 transfer ratio that the two above-threshold changes in this project's history
+actually achieved, that is -0.0070 to -0.0076 on the board: **0.6927 -> about 0.685**.
+
+Both are the same kind of finding, and it is the kind that has transferred: a feature family that
+was present but unreadable. In session 9 the water-balance covariates were raw millimetres, which a
+model without lat/lon cannot use. Tonight they were offered only at 1 degree, which is the one
+spatial scale at which reanalysis P-E-R is least trustworthy and at which our error does not live.
+Neither was a modelling failure; both were representation failures.
+
+`FINALvn2` is building with both fixes. The radius was fixed at 4 from the correlation scan
+(0.177 at the cell, 0.208 at r=1, 0.225 at r=2, **0.242 at r=4**, 0.232 at r=8, 0.190 at r=16), so
+it sits at the measured optimum, but only ONE radius is offered. Giving the model two or three
+radii at once is the obvious next step and was not tried for lack of time.
