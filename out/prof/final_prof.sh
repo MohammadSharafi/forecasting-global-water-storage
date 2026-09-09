@@ -5,8 +5,13 @@
 #   sh out/prof/final_prof.sh 'bigsa,e5prof'     GDO only
 #   sh out/prof/final_prof.sh 'bigsa,gdo'        profile only
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+# build_mats defaults PER_ROW to 3; the value gated by perrow_scan.py and used by every
+# matrix the pipeline ships is 2. Set it explicitly -- an unset PER_ROW here silently
+# builds a third more training rows than the configuration being shipped, and on this
+# machine that is also the difference between a build that finishes and one the kernel kills.
+export PER_ROW=${PER_ROW:-2}
 FD=${1:-bigsa}; L=FINALe; TAG=_g1; SEEDS=${SEEDS:-16}
-LGBR=${LGBR:-410}; XGBR=${XGBR:-230}; H1R=${H1R:-353}; HB=${HB:-0.50}
+LGBR=${LGBR:-410}; XGBR=${XGBR:-230}; H1R=${H1R:-353}; HB=${HB:-0}; OUT=${OUT:-sub_r_prof}
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 
 say "FINAL soil-profile run: DROPF='$FD' seeds=$SEEDS rounds lgb=$LGBR xgb=$XGBR h1=$H1R beta=$HB"
@@ -44,9 +49,11 @@ for m in lgb xgb; do
   done
 done
 
-# the horizon-1 specialist, spliced at the beta the scan adopted
+# the horizon-1 specialist, spliced at the beta the scan adopted. hsplice re-run on the new
+# feature set did NOT adopt it (the better general model absorbed it), so HB=0 by default and
+# these sixteen runs do not happen; pass HB=0.50 to build the control file instead.
 s=0
-while [ "$s" -lt "$SEEDS" ]; do
+while [ "$HB" != "0" ] && [ "$HB" != "0.00" ] && [ "$s" -lt "$SEEDS" ]; do
   f=out/mats/pred_${L}_lgb_v5x_noll_s${s}_h1g.npy
   if [ -f "$f" ]; then s=$((s+1)); continue; fi
   say "  train h1 s$s"
@@ -57,9 +64,10 @@ while [ "$s" -lt "$SEEDS" ]; do
 done
 
 say "assemble"
-FLAYOUT=$L TAG=$TAG SMOOTH_W1=0.7 SMOOTH_W7=0.7 SMOOTH_R=1 SMOOTH_IT=1 SMOOTH_WRAP=0 \
-  H1SPEC=lgb_v5x_noll H1TAG=_h1g H1BETA=$HB \
-  $PY final_assemble.py sub_r_prof lgb_v5x_noll:0.5 xgb_v5x_noll:0.5 2>&1 | tee out/prof/assemble.log
-FLAYOUT=$L TAG=$TAG SMOOTH_W=0 H1SPEC=lgb_v5x_noll H1TAG=_h1g H1BETA=$HB \
-  $PY final_assemble.py sub_r_prof_nosm lgb_v5x_noll:0.5 xgb_v5x_noll:0.5 > out/prof/assemble_nosm.log 2>&1
+H1ENV=""
+if [ "$HB" != "0" ] && [ "$HB" != "0.00" ]; then H1ENV="H1SPEC=lgb_v5x_noll H1TAG=_h1g H1BETA=$HB"; fi
+env FLAYOUT=$L TAG=$TAG SMOOTH_W1=0.7 SMOOTH_W7=0.7 SMOOTH_R=1 SMOOTH_IT=1 SMOOTH_WRAP=0 $H1ENV \
+  $PY final_assemble.py $OUT lgb_v5x_noll:0.5 xgb_v5x_noll:0.5 2>&1 | tee out/prof/assemble.log
+env FLAYOUT=$L TAG=$TAG SMOOTH_W=0 $H1ENV \
+  $PY final_assemble.py ${OUT}_nosm lgb_v5x_noll:0.5 xgb_v5x_noll:0.5 > out/prof/assemble_nosm.log 2>&1
 say "done"

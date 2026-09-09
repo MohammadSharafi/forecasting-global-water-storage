@@ -1880,3 +1880,50 @@ Validation runs about 2.1x optimistic here, so -0.0036 on validation is worth ro
 the board: 0.6927 -> about 0.691. Real, gated, and reproducible -- and not remotely enough to reach
 the 0.6495 cluster. The gap to that cluster is 0.043, and nothing measured in this project has ever
 been worth a tenth of it except the anomaly encoding.
+
+## The horizon-1 splice is no longer adopted, and that is the profile's doing
+
+`hsplice` was re-run on the new feature set rather than carrying beta=0.50 across a feature change:
+
+    layout Ae   general 0.6191   specialist 0.6163
+    layout Be   general 0.4911   specialist 0.4866
+    layout Ce   general 0.4627   specialist 0.4621
+
+    leave-one-layout-out:  chosen on Be+Ce -> 0.8, held-out Ae -0.00095
+                           chosen on Ae+Ce -> 0.7, held-out Be -0.00117
+                           chosen on Ae+Be -> 1.0, held-out Ce -0.00018
+    not adopted: beta=0.00
+
+Two of the three held-out gains clear the threshold comfortably and the third does not, so the rule
+rejects it. Worth stating why the answer flipped: on the old feature set the general model scored
+0.6229 at h=1 on layout A and the specialist was worth splicing at half weight; with the soil
+profile the general model scores 0.6191 there, which is most of what the specialist was adding. A
+better general model absorbs its own specialist. The FINAL run for this feature set therefore trains
+no specialist, which also saves sixteen training runs.
+
+Close call, and recorded as one: at a single global beta=0.8 all three layouts clear (-0.00095,
+-0.00125, -0.00043), but that is an in-sample choice and this project does not adopt on in-sample
+choices. A control file with the splice at 0.5 is assembled alongside the gated one so the board can
+arbitrate if a submission is available for it.
+
+## A correction: the ablation ran at PER_ROW=3, the pipeline ships PER_ROW=2
+
+`build_mats` defaults PER_ROW to 3; `run_night.sh` passes 2, which is the value `perrow_scan.py`
+gated in session 10. Building `Ae` by hand took the default, so the whole four-arm ablation ran on
+matrices with a third more training rows than the configuration being shipped:
+
+    A_tr   (PER_ROW=2, the pipeline's)   2,971,466 rows
+    Ae_tr  (PER_ROW=3, mine)             4,028,741 rows
+
+The comparison between arms is unaffected -- all four arms shared one matrix, which is the whole
+point of building them that way -- and the absolute numbers line up with the earlier sweep exactly
+as they should: the night run scored this configuration at 0.6383 on layout A with PER_ROW=2, the
+sweep measured p3 as +0.0024 worse, and the base arm here scores 0.6402. That agreement is a useful
+independent check that nothing else moved.
+
+What it does mean is that the profile was gated at p3 and will ship at p2, so the gate is one step
+removed from the shipped configuration. The scripts now set PER_ROW explicitly, and re-confirming
+the profile at p2 is the first thing to do with spare time after the submission exists.
+
+It is also what killed the FINALe build: `Killed: 9` from the kernel, at roughly 5.4M rows x 328
+columns. At PER_ROW=2 it is about 4.0M x 328, the size that already built successfully for Ae.

@@ -15,6 +15,10 @@ from features2 import FEATS2
 from features4 import AR
 from features5 import WIDE
 from features6 import RECENT, LONGTERM
+# One parser for layout names: 'FINALe' is a FINAL matrix, 'Ap3' and 'Ae' are layout A.
+# Imported rather than re-derived -- add_anchor_feats.py carried its own copy of this and
+# the two disagreed the moment a second variant suffix existed.
+from build_mats import base_of as layout_base
 L,M,FS=sys.argv[1:4]; R=int(sys.argv[4]) if len(sys.argv)>4 else None; t0=time.time()
 # CARBON=1 instruments THIS training run with CodeCarbon. The sustainability criterion asks for
 # emissions measured WHILE training runs -- it cannot be reconstructed afterwards -- so the
@@ -144,11 +148,11 @@ if os.environ.get("HMIX","")=="test":
     print(f"  HMIX=test: train horizon freq {[round(freq[k],3) for k in range(1,8)]}"
           f" -> weight range {hw.min():.2f}..{hw.max():.2f}",flush=True)
 del tr; gc.collect()
-va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if L!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
+va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if layout_base(L)!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
 if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
 if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
-Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if L!="FINAL" else None
+Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if layout_base(L)!="FINAL" else None
 # a specialist must be early-stopped on ITS OWN slice; predictions are still made for every row
 hv=va["horizon"].to_numpy(); VM=(hv>=HLO)&(hv<=HHI) if HFILT else None
 del va; gc.collect()
