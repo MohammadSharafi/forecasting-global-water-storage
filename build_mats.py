@@ -13,24 +13,40 @@ from features5 import add_wide, WIDE
 from features6 import add_recent, RECENT, LONGTERM
 from features_ncep import load_ncep, add_ncep
 import glob
-from features_era5 import load_era5, add_era5, ERA5F
+from features_era5 import load_era5, add_era5, era5_feats
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
 from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
 from features_scale import add_scale, SCALE
 from features_gdo import load_gdo
 
 
+# A layout may carry its variant in its NAME -- 'Ap3' is layout A built with PER_ROW=3, 'Ae' is
+# layout A built with the ERA5 soil profile split apart, 'FINALe' likewise. The variant writes to
+# out/mats/<name>_*.parquet and leaves the cached A_*/FINAL_* matrices untouched, which is what
+# makes it safe to sweep a parameter that changes every matrix on a machine holding a working
+# submission.
+_LNAME = re.compile(r"(FINAL|[ABC])(?:p(\d+))?(e)?$")
+
+
+def _parse(L):
+    m = _LNAME.fullmatch(L)
+    return m.groups() if m else (L, None, None)
+
+
 def base_of(L):
-    """'Ap3' -> 'A'.  A layout may carry its own PER_ROW as a suffix so that a training-set-size
-    sweep writes to its own matrices instead of overwriting the cached ones."""
-    m = re.fullmatch(r"([ABC])p(\d+)", L)
-    return m.group(1) if m else L
+    """'Ap3' -> 'A', 'Ae' -> 'A', 'FINALe' -> 'FINAL'."""
+    return _parse(L)[0]
+
+
+def prof_of(L):
+    """True when this layout wants the ERA5 soil layers kept apart instead of summed."""
+    return _parse(L)[2] is not None
 
 
 def per_row_of(L, default=None):
-    m = re.fullmatch(r"([ABC])p(\d+)", L)
-    if m:
-        return int(m.group(2))
+    pr = _parse(L)[1]
+    if pr is not None:
+        return int(pr)
     return int(os.environ.get("PER_ROW", "3")) if default is None else default
 
 
@@ -49,8 +65,9 @@ def prepare(L, t0=None):
     # the same per-cell standardisation that made the ERA5/NCEP block work. Absent unless
     # downloaded, and a no-op when absent, exactly like ERA5.
     gdo, gcols = load_gdo(lats, lons)
-    ERA = load_era5() if glob.glob("external/era5/*.nc") else None
-    print("era5:", None if ERA is None else ERA.shape, flush=True)
+    ERA = load_era5(prof=prof_of(L)) if glob.glob("external/era5/*.nc") else None
+    print("era5:", None if ERA is None else ERA.shape,
+          "(soil profile split)" if prof_of(L) else "", flush=True)
     print("gdo:", gcols or "not present", flush=True)
     print("ext loaded", cols, cols2, cols3, f"({time.time()-t0:.0f}s)", flush=True)
     if base_of(L) == "FINAL":
@@ -76,7 +93,8 @@ def prepare(L, t0=None):
     # modelled total water storage: soil water + snow, the predictor the literature ranks first
     ERA = add_mtws(ERA, "e5SW", "e5SWE", "e5MTWS", 1000.0)   # e5SW is metres of water, e5SWE is mm
     nc = add_mtws(nc, "SW", "SWE", "MTWS")                   # both already mm
-    ANOM = [x for x in (anom_build(ERA, ERA5_STORAGE, ERA5_FLUX, HM),
+    E5S = [c for c in ERA5_STORAGE if ERA is None or c in ERA.columns]
+    ANOM = [x for x in (anom_build(ERA, E5S, ERA5_FLUX, HM),
                         anom_build(nc, NCEP_STORAGE, NCEP_FLUX, HM),
                         anom_build(cov_all.select(["lat", "lon", "time"]+COV_STORAGE).unique(["lat", "lon", "time"]), COV_STORAGE, [], HM),
                         # SPI and fAPAR are indices/levels, so storage-like: z-scored value at t
@@ -91,7 +109,7 @@ def prepare(L, t0=None):
         r = add_wide4(r); r = add_covwin(r, cov_all); r = add_response(r, resp)
         EF = []
         if ERA is not None:
-            r = add_era5(r, ERA); EF = ERA5F
+            r = add_era5(r, ERA); EF = era5_feats(ERA)
         AF = []   # per-cell standardised covariate anomalies (features_anom): the level features above
         for at, sz, fz in ANOM:   # are raw mm and unusable without lat/lon, which is not a feature
             r, f = add_anom(r, at, sz, fz); AF += f

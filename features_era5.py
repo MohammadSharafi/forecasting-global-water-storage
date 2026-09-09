@@ -5,7 +5,7 @@ for monthly totals (mm equivalent x1000). swvl are m3/m3; sd is m of water equiv
 import polars as pl, numpy as np, glob, xarray as xr, os
 from features import mdiff
 VARS={"tp":"tp","e":"e","ro":"ro","sd":"sd","swvl1":"swvl1","swvl2":"swvl2","swvl3":"swvl3","swvl4":"swvl4","t2m":"t2m"}
-def load_era5(pattern="external/era5/era5_monthly_1deg_*.nc"):
+def load_era5(pattern="external/era5/era5_monthly_1deg_*.nc", prof=False):
     """Each CDS file is a zip with two netcdf members (accumulated-mean stream: tp,e,ro; instantaneous-mean stream:
     sd, swvl1-4, t2m). Each member becomes its own (lat, lon, month) table; the two are joined on cell-month."""
     import zipfile
@@ -29,14 +29,39 @@ def load_era5(pattern="external/era5/era5_monthly_1deg_*.nc"):
     df=df.with_columns([(pl.col("tp")*1000*pl.col("dim")).alias("P"),(-pl.col("e")*1000*pl.col("dim")).alias("E"),(pl.col("ro")*1000*pl.col("dim")).alias("R"),
                         (0.07*pl.col("swvl1")+0.21*pl.col("swvl2")+0.72*pl.col("swvl3")+1.89*pl.col("swvl4")).alias("SW"), (pl.col("sd")*1000).alias("SWE"), pl.col("t2m").alias("T2M")])
     df=df.with_columns((pl.col("P")-pl.col("E")-pl.col("R")).alias("PER"))
-    df=df.select(["lat","lon","time","P","E","R","PER","SW","SWE","T2M"]).rename({c:"e5"+c for c in ["P","E","R","PER","SW","SWE","T2M"]})
+    keep=["P","E","R","PER","SW","SWE","T2M"]
+    if prof:
+        # The four ERA5 soil layers, kept apart instead of summed. Every soil product in this
+        # pipeline collapses its profile -- ERA5's four swvl layers into one SW here, and NCEP-R1
+        # and R2's 0-10cm and 10-200cm into one SW in features_ncep/features_x -- so the shallow
+        # and deep stores appear nowhere as separate quantities. That is the drainage timescale:
+        # the 7 cm top layer answers a month of rain, the 189 cm bottom layer integrates seasons,
+        # and TWS is the integral. A fixed-weight sum is exactly the operation that destroys the
+        # contrast between them. Each is metres of water, so they sum back to SW by construction.
+        df=df.with_columns([(0.07*pl.col("swvl1")).alias("SW1"),(0.21*pl.col("swvl2")).alias("SW2"),
+                            (0.72*pl.col("swvl3")).alias("SW3"),(1.89*pl.col("swvl4")).alias("SW4")])
+        keep+=["SW1","SW2","SW3","SW4"]
+    df=df.select(["lat","lon","time"]+keep).rename({c:"e5"+c for c in keep})
     return df
 E5=["e5P","e5E","e5R","e5PER","e5SW","e5SWE","e5T2M"]
+E5PROF=["e5SW1","e5SW2","e5SW3","e5SW4"]
+E5DIFF=["e5SW","e5SWE","e5T2M"]
+
+
+def e5_cols(era):
+    """The ERA5 columns actually present, so the soil-profile split is additive and optional."""
+    return [c for c in E5+E5PROF if c in era.columns]
+
+
+def era5_feats(era):
+    c=e5_cols(era); d=[x for x in E5DIFF+E5PROF if x in era.columns]
+    return [x+"_t" for x in c]+[x+"_k" for x in c]+[x+"_d" for x in d]+["e5PER_acc","e5P_acc","e5E_acc","e5R_acc"]
 def add_era5(r, era):
     """r must have lat, lon, time, t_known, horizon."""
-    r=r.join(era.rename({c:c+"_t" for c in E5}),on=["lat","lon","time"],how="left")
-    r=r.join(era.rename({"time":"t_known",**{c:c+"_k" for c in E5}}),on=["lat","lon","t_known"],how="left")
-    for c in ("e5SW","e5SWE","e5T2M"): r=r.with_columns((pl.col(c+"_t")-pl.col(c+"_k")).alias(c+"_d"))
+    E=e5_cols(era)
+    r=r.join(era.rename({c:c+"_t" for c in E}),on=["lat","lon","time"],how="left")
+    r=r.join(era.rename({"time":"t_known",**{c:c+"_k" for c in E}}),on=["lat","lon","t_known"],how="left")
+    for c in [x for x in E5DIFF+E5PROF if x in E]: r=r.with_columns((pl.col(c+"_t")-pl.col(c+"_k")).alias(c+"_d"))
     # accumulated water balance over (t_known, t]  (the months TWS was unobserved, plus t itself)
     w=era.select(["lat","lon","time","e5P","e5E","e5R","e5PER"]).rename({"time":"tw"})
     j=r.select(["lat","lon","time","t_known"]).unique().join(w,on=["lat","lon"],how="inner").filter((pl.col("tw")>pl.col("t_known"))&(pl.col("tw")<=pl.col("time")))

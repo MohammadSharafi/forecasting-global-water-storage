@@ -41,6 +41,15 @@ Two measurement corrections matter more than any model change:
   over-weights h2/h3 by 5.6 points each and under-weights h1/h4 by the same, so for several
   sessions any method that traded h1 accuracy for mid-horizon accuracy was scored more kindly by
   validation than the leaderboard would score it.
+A third measurement correction is the ensemble weight, and it is worth recording because the
+leaderboard has now ruled on it in **both** directions. `stack.py`'s non-negative least squares gave
+a second-capacity model a weight of exactly 0.000; the leaderboard said that model *alone* scored
+within 0.002 of the best, which looked like the fit throwing away a good model. Spending two
+submissions on the question settled it against the doubt: the score degrades monotonically with the
+weight given to that model (0.692657 → 0.693283 at 0.3 → 0.693725 at 0.5). A model that scores well
+alone adds nothing to an ensemble it is correlated with, and the fitted zero was a measurement
+rather than an artifact.
+
 - **`xfit.py`** applies leave-one-layout-out to every post-processing decision: the configuration is
   chosen on the other layouts and scored on the **held-out** one, and nothing is adopted unless
   every held-out gain clears 0.0003. That threshold is derived, not chosen: `lb_se.py` computes the
@@ -132,6 +141,7 @@ because each one stopped effort being spent in the wrong place.
 | higher-resolution forcing (ERA5-Land) | residual spatial correlation +0.967 at lag 1, +0.899 at lag 2 | the error is large-scale and coherent; it does not live at fine scales |
 | recursive forecasting (explicitly permitted) | chained one-step forecasts against the direct model on layouts A, B and C, through the pipeline's own feature builder (`recursive.py`) | **measured and closed.** Test-mix RMSE direct/recursive: A 0.6383/0.6657, B 0.5356/0.5909, C 0.5315/0.5692 — worse at 21 of 21 (layout, horizon) cells, and by more as the horizon grows, which is the opposite of the only shape that would have justified building it out. A free 50/50 blend also loses everywhere. The cause is the one the bound predicted: the one-step model is no better than the direct model at h=1 (0.6232 vs 0.6238 on A), so recursion pays that error as an anchor and then compounds it |
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
+| dropping the features that are dead at h=1 (31 all-null, 33 identically zero — 64 of 266) | six matched control/treatment pairs, two seeds on each layout (`DEADF=1`) | **rejected on accuracy, kept as an efficiency option.** Mean effect **+0.0000** with a spread of 0.0027, larger than the effect and than the seed-to-seed spread of the control. The premise is right and the conclusion does not follow: a 0.6 feature draw from 261 features with 65 dead yields ~118 live candidates, and from the 196 live features it also yields ~118 — a constant column is never a competitor for a split, only a name the sampler passes over. It does cut training time 25% |
 | the residual's anchor (predict `target − anom_persist` instead of `target − tws_known`) | three gap-free placements, both anchors trained on identical rows and scored on an identical mask (`fastval.py`) | **rejected.** Carrying the anchor's raw departure forward wins 0.0055 and 0.0052 on two placements and loses 0.0016 on the third, so the every-layout rule refuses it; the standardised form loses everywhere (+0.011 to +0.016), because it carries the ratio of two noisy per-cell sd estimates into every prediction. The pipeline already has `anom_persist` as its highest-gain feature at 9.4%, which is the likeliest reason moving it into the anchor buys little |
 | groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | no gain: the per-cell per-calendar-month climatology already carries the cell's slow state. Indicative rather than settled — see the note below on the placements these used |
 | directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | no gain: the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors. Same caveat as the row above |
@@ -275,4 +285,7 @@ docstring.
 | starting point of this work | 0.709259 |
 | covariate anomalies + the session's feature work | 0.696326 |
 | smoothing kept, calibration dropped | **0.695965** |
-| final submission (`out/sub_q_main.csv`: 261 features, corrected round counts, β=0.50 horizon-1 splice) | **awaiting score** |
+| layout-C repair (zonal features kept, h=1 specialist adopted) + corrected boosting rounds | **0.692657** |
+| 0.7/0.3 blend with a second capacity | 0.693283 |
+| 0.5/0.5 blend with a second capacity | 0.693725 |
+| **final submission** (`out/sub_q_main.csv`) | **0.692657** |

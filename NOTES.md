@@ -1722,3 +1722,110 @@ Neither is dead, but neither is adoptable on this evidence. The cheap next measu
 returns to it, is `ap` inside the real pipeline rather than the 40-feature harness -- where
 `anom_persist` is already the single highest-gain feature (9.4% on layout A), which is itself
 evidence that the pipeline has largely found this signal through the feature rather than the anchor.
+
+# Session 10d — the leaderboard: a new best, and the blend question answered against the blend
+
+Three files scored:
+
+    sub_q_main    0.692657311   NEW BEST   (previous best 0.695965, -0.003308)
+    sub_blend73   0.693283      +0.000626 vs main   (0.7 main + 0.3 alt)
+    sub_blend55   0.693725      +0.001068 vs main   (0.5 main + 0.5 alt)
+
+## The blend is refuted, and stack.py was right all along
+
+Session 9x doubted the fitted ensemble weight: stack.py's NNLS gave the 31-leaf model a weight of
+**0.000**, while the leaderboard said that model alone scored 0.698048, within 0.002 of the best.
+"Two points apart is not adds-nothing" was the argument, and `blend_subs.py` was written to spend
+a submission settling it rather than trusting the fit.
+
+It is settled, and the fit wins. The response is monotone in the alt weight:
+
+    alt weight   0.0        0.3        0.5
+    score        0.692657   0.693283   0.693725
+    delta        --         +0.000626  +0.001068
+
+Both gaps clear the readability threshold for these files (RMS difference 0.0057 and 0.0095 -> a
+gap under about 0.00005 and 0.00007 would be noise), so this is a real, ordered effect and not a
+coin flip. Every unit of the alt model makes the file worse in proportion.
+
+The lesson is not "trust validation" -- validation adopted the per-horizon calibration the
+leaderboard then refuted. It is narrower and more useful: **a fitted zero from a non-negative least
+squares over test-mix-weighted rows is a measurement, not an artifact of the optimiser**, and the
+intuition that a model scoring well ALONE must add something to an ensemble is simply wrong when
+that model is correlated with what is already in it. sub_q_alt shares the feature set, the training
+matrix and the anchor with the main model; only its capacity differs. It is not a different bet.
+
+## What produced the 0.003308
+
+Three changes landed together in the run that made this file and cannot be separated without
+spending submissions on the ablation:
+
+  * the layout-C repair changed the chosen configuration, `DROPF='scale,bigsa'` -> `'bigsa'`,
+    so the zonal features are kept -- the broken C had voted them out;
+  * the h=1 specialist was adopted at beta=0.50, which hsplice had rejected every time the broken
+    layout C was in the vote;
+  * rounds.py's correction for FINAL training on 138 history months against layout A's 111:
+    lgb 330->410, xgb 185->230.
+
+All three trace back to session 9's finding that a validation layout was silently broken. The
+honest summary is that repairing the measurement was worth 0.0033 on the board, which is roughly a
+quarter of what the covariate-anomaly encoding was worth and was bought with no new information.
+
+## Private slots
+`sub_q_main` and `sub_blend73` are ticked. That is defensible even though blend73 is 0.0006 worse
+publicly: the two files differ by an RMS of 0.0057, blending two capacities is the classic
+variance-reduction hedge, and the public set is ~84k rows against a private set that is scored
+separately. Nothing else on hand is both competitive and genuinely different in kind -- sub_q_base
+is the pre-session-9 feature set and scored 0.708852.
+
+# Session 10e — the dead features at h=1 are harmless, and the reason is worth knowing
+
+The backlog's idea 4: at horizon 1 the accumulation window (t_known, t] is empty, so the `_acc`
+features are null and the `_d` differences are exactly zero. Give the h=1 specialist its own
+feature list with those removed.
+
+The premise is real, and larger than the estimate. Measured on `A_tr.parquet` directly rather
+than assumed: at h=1, **31 features are entirely null and 33 are identically zero — 64 of 266**,
+a quarter of the set, on the slice that is 33.3% of the test by weight. With the anchor block it
+is 65 of 261 in the chosen configuration.
+
+`DEADF=1` in run_models.py drops any feature that is constant on the rows the run actually trains
+on. It is computed from the data, not from a stored list, so it cannot go stale when the feature
+set changes, and it is safe by construction -- a column with one distinct value has no information
+to lose. Control and treatment, lgb, `DROPF=bigsa`, two seeds on each layout:
+
+    layout  seed   control  DEADF=1     delta
+    A          0    0.6617   0.6619   +0.0002
+    A          1    0.6630   0.6629   -0.0001
+    B          0    0.5859   0.5865   +0.0006
+    B          1    0.5891   0.5859   -0.0032
+    C          0    0.6066   0.6113   +0.0047
+    C          1    0.6086   0.6065   -0.0021
+
+    mean effect over six pairs   +0.0000
+    sd of the effect              0.0027
+    seed-to-seed spread of the control within a layout   0.0022
+
+The effect is exactly zero and its spread is larger than itself, and larger than the adoption
+threshold by an order of magnitude. **Not adopted.**
+
+## Why the plausible mechanism does not bite
+
+The argument was that `feature_fraction=0.6` offers the sampler ~39 dead candidates at every split,
+so a quarter of its draws are wasted. The arithmetic is right and the conclusion does not follow.
+With 261 features of which 65 are dead, a 0.6 draw yields ~157 candidates of which ~118 are live.
+With the 196 live features alone, a 0.6 draw yields ~118 candidates, all live. **The number of live
+candidates per split is the same either way.** Dropping the dead columns does not give the tree
+more to choose from; it only changes the effective subsampling rate of the live pool, from 118/196
+to 118/196 -- which is to say, it changes nothing that matters, and what is left is the seed noise
+the table shows. A constant column cannot be split on, so it is not a competitor for a split, only
+a name the sampler passes over.
+
+This is the same shape of error as the raw-millimetres correlation and the recursion bound: an
+argument that sounds mechanical, is arithmetically correct in its premise, and does not survive
+being run.
+
+## What it is worth: 25% of the training time
+Six matched pairs, 432 s of control against 323 s. That is real and it is free, since accuracy is
+unchanged, and it applies to every specialist run. Recorded under §6.4 rather than as an accuracy
+change, and left OFF by default so the submitted configuration is the one that was gated.

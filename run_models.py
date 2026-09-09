@@ -71,6 +71,12 @@ DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "e5prof" in DROPF:
+    # the split soil layers share the e5/an_ prefixes with the rest of the ERA5 block, so without
+    # their own switch their contribution could not be measured separately from it
+    import re as _re
+    _p = _re.compile(r"^(an_)?e5SW[1-4](z)?_")
+    F=[f for f in F if not _p.match(f)]
 if "gdo"   in DROPF:
     # the GDO block shares the an_ prefix with the ERA5/NCEP anomalies, so without its own switch
     # its contribution could never be measured separately from theirs
@@ -104,6 +110,25 @@ if HFILT:
     n0=len(tr); tr=tr.filter((pl.col("horizon")>=HLO)&(pl.col("horizon")<=HHI))
     print(f"  HFILT={HFILT}: {len(tr)}/{n0} training rows kept",flush=True)
 if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
+# DEADF=1 drops the features that carry nothing on the rows this run actually trains on. It
+# matters for a horizon specialist: at h=1 the accumulation window (t_known, t] is empty, so every
+# _acc feature is null and every _d difference is exactly zero -- 64 of the 266 features on this
+# matrix, a quarter of the set, on the slice that is 33.3% of the test by weight. With
+# feature_fraction=0.6 the sampler is offered ~38 dead candidates at every split, and a constant
+# column cannot be chosen usefully, so those draws are simply wasted. Measured from the data
+# rather than from a stored list, so it cannot go stale when the feature set changes, and it is
+# safe by construction: a column with one distinct value carries no information to lose.
+if os.environ.get("DEADF","")=="1":
+    n0=len(tr)
+    st=tr.select([pl.col(f).is_finite().sum().alias(f"n{i}") for i,f in enumerate(F)]
+                +[pl.col(f).filter(pl.col(f).is_finite()).min().alias(f"lo{i}") for i,f in enumerate(F)]
+                +[pl.col(f).filter(pl.col(f).is_finite()).max().alias(f"hi{i}") for i,f in enumerate(F)]).row(0)
+    nF=len(F); keep=[f for i,f in enumerate(F)
+                     if st[i] and st[nF+i] is not None and st[nF+i]!=st[2*nF+i]]
+    if len(keep)<len(F):
+        print(f"  DEADF: dropped {len(F)-len(keep)} feature(s) constant on these {n0} rows"
+              f" -> {len(keep)} remain",flush=True)
+    F=keep
 X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
 if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)   # no recent-year emphasis (test regime differs from the last training years)

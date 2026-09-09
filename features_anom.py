@@ -143,7 +143,9 @@ def add_mtws(tab, soil, snow, out, soil_scale=1.0):
 
 
 # which covariates behave like a stored quantity and which like a flux
-ERA5_STORAGE = ["e5SW", "e5SWE", "e5T2M", "e5MTWS"]
+ERA5_STORAGE = ["e5SW", "e5SWE", "e5T2M", "e5MTWS", "e5SW1", "e5SW2", "e5SW3", "e5SW4"]
+# the four soil layers are present only in a profile build; build_mats filters this list to
+# the columns the loaded table actually has, so the extra names are a no-op otherwise
 ERA5_FLUX = ["e5P", "e5E", "e5R", "e5PER"]
 NCEP_STORAGE = ["SW", "SWE", "MTWS"]
 NCEP_FLUX = ["P", "E", "R", "PER"]
