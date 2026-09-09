@@ -2283,3 +2283,49 @@ That family is exhausted. ONI as a feature was killed in session 3 with a mechan
 The NCEP-R2 + CPC + SPEI anomaly encoding, -0.0022 on all three layouts, is the only live result and
 is training. Nothing found tonight beats it, and the seven kills cost about three hours of analysis
 and twenty minutes of training between them.
+
+# Session 10n — the domain is GLOBAL, and where the remaining error actually lives
+
+## The documentation was wrong about the domain
+The addendum and several notes describe "a 40x40 box over tropical South America". It is not:
+
+    15,715 cells, lat -55.5 .. +83.5, lon -179.5 .. +179.5, 140 latitudes x 358 longitudes
+    68.9% of cells lie north of 19.5N, 44.7% north of 45N, 9.0% south of 19.5S
+
+Two consequences. The `~/gdo_dl`-style ERA5 box (24.5N/-84.5W/-24.5S/-35.5E) covers **7.6%** of the
+domain -- copying it into `external/era5` would have deleted ERA5 for 92% of the grid, which is
+precisely why the staging rule of session 10b mattered. And "snow is dead weight, the box stops at
+19.5N" is wrong by 69% of the domain; snow is a first-order TWS term over nearly half the grid.
+Neither error reached a model: the global ERA5 files are what is loaded, and the snow features are
+present and encoded.
+
+## Where the error is, measured six ways
+1. **By region** -- uniform. RMSE 0.58-0.66 across six latitude bands, and each band's share of MSE
+   tracks its share of cells. There is no regional hole to fix.
+2. **By snow** -- uniform. 0.55 snowy, 0.61 light, 0.65 snow-free.
+3. **The target field is extremely smooth.** Blur the TRUE answer over its 8 neighbours and the
+   score is **0.0619**; over a 5x5 it is 0.1353. So there is almost no 1-degree-scale noise, and no
+   measurement-noise floor anywhere near our 0.62.
+4. **But our error is just as smooth.** RMS(error - mean of its neighbours' error) is 0.0842 against
+   a total error of 0.6237: **98.2% of our error variance is shared with the neighbours.** Spatial
+   averaging cannot touch it. That caps every spatial method -- smoothing, a CNN, a graph net, EOF
+   truncation -- at 1.8% of error variance, about 0.006 of RMSE at the absolute best.
+5. **The field is low-rank and the error lives inside that subspace.** 36 EOFs carry 90% of the
+   field's variance and the leading PCs have lag-1 autocorrelation +0.92 to +0.98. Projecting our
+   prediction onto the leading k modes (basis fitted with the validation window excluded) is worse
+   at every k and improves monotonically toward no projection: k=36 costs +0.059, k=110 costs
+   +0.027. Our error is not high-order noise outside the signal subspace; it is inside it.
+6. **Compliance is not the gap.** Adding `lat`/`lon` back -- a diagnostic that will never be
+   submitted -- is worth **-0.0011**. Excluding coordinates costs about a thousandth, not a
+   fortieth.
+
+## What that means for a 0.64 target
+The remaining error is large-scale, spatially coherent, regionally uniform, temporally white, and
+inside the field's own low-rank subspace. The forcing that could explain it does not: the ERA5
+water-balance anomaly correlates +0.235 with the one-month TWS change, which is 5.5% of its
+variance.
+
+Closing 0.043 on the board would mean explaining roughly another 13% of target variance. Nothing
+measured in this project comes within an order of magnitude of that, and the four structural classes
+that could have -- spatial modelling, post-processing, representation, regime adaptation -- are now
+each closed by measurement rather than by argument.
