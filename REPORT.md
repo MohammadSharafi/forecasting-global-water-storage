@@ -52,10 +52,29 @@ rather than an artifact.
 
 - **`xfit.py`** applies leave-one-layout-out to every post-processing decision: the configuration is
   chosen on the other layouts and scored on the **held-out** one, and nothing is adopted unless
-  every held-out gain clears 0.0003. That threshold is derived, not chosen: `lb_se.py` computes the
+  every held-out gain clears 0.0003. That threshold is derived from `lb_se.py`, which computes the
   standard error of a leaderboard gap from the RMS difference between two submission files and the
-  public row count, and differences below roughly 0.001 between the files involved here are not
-  distinguishable from noise.
+  public row count.
+
+  **That threshold turned out to be measuring the wrong thing, and this is the most important
+  methodological finding in this report.** `lb_se.py` answers *how precisely can the public subset
+  measure a difference that exists*. The question that governs whether a change should be adopted is
+  different: *how well does a validation delta predict the board delta*. Every paired observation
+  this project has produced:
+
+  | change | validation | board | transferred? |
+  |---|---|---|---|
+  | covariate anomaly encoding (§3.1) | −0.0156 | −0.0129 | yes, at 0.83× |
+  | smoothing versus none | +0.0037 | +0.0028 | yes, at 0.77× |
+  | ERA5 soil profile (§3.2b) | −0.0036 | **+0.0027** | no — sign inverted |
+  | per-horizon calibration | −0.0005 | **+0.0004** | no — sign inverted |
+  | smoothing 0.7/it1 → 0.5/it2 | −0.0001 | **+0.0001** | no — sign inverted |
+
+  Two changes above 0.0037 transferred, at a consistent 0.77–0.83 of their validation size. Three
+  changes below 0.0036 inverted. Five points is not a law, but it has never gone the other way, and
+  it says the honest adoption threshold for this problem is nearer **0.003** than 0.0003 — ten times
+  stricter than the rule actually used. Every decision taken on a margin inside that band was taken
+  on noise, and those are precisely the decisions that failed on the board.
 
 The standing rule is that a change must win on **every** layout it was run on. `select_config.py`
 applies it to four independent decisions (feature groups, model capacity, sample weighting, training

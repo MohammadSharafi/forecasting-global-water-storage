@@ -2121,3 +2121,50 @@ below this project's own 0.0003 adoption threshold, so this is not an adoption -
 option on the table with a negative expected delta, and a submission that scores worse cannot lower
 the displayed best score, so the downside is zero. The post-processing surface is flat and there is
 no larger free lever left in it.
+
+# Session 10k — the submission lost, and the reason matters more than the loss
+
+    sub_t_sm05it2   0.692773095   against 0.692657   +0.000116 WORSE
+
+I predicted -0.000073 with a standard error of 0.000039. The outcome is 4.8 standard errors from
+that estimate, which means the estimate was not merely unlucky -- the uncertainty I quoted was the
+wrong uncertainty. `lb_se.py` gives the sampling error of a leaderboard gap between two files: how
+precisely the public subset can measure a difference that exists. I used it as though it also
+covered whether the validation delta predicts the board delta at all. It does not, and that second
+source of error is an order of magnitude larger.
+
+## Every paired observation this project has
+
+    change                           validation        board     ratio   transferred?
+    covariate anomaly encoding         -0.01560    -0.012900     +0.83   yes
+    smoothing 0.7 vs none              +0.00369    +0.002823     +0.77   yes
+    ERA5 soil profile                  -0.00360    +0.002709     -0.75   NO, sign inverted
+    per-horizon calibration            -0.00050    +0.000361     -0.72   NO, sign inverted
+    smoothing 0.7/it1 -> 0.5/it2       -0.00010    +0.000116     -1.21   NO, sign inverted
+
+Two changes at |validation| >= 0.0037 transferred, at a consistent 0.77-0.83 of their validation
+size. Three changes at |validation| <= 0.0036 inverted. Five points is not a law, but the direction
+of the evidence is unambiguous and it has never once gone the other way.
+
+## The adoption threshold has been wrong the whole time
+The standing rule adopts a change whose held-out gain clears **0.0003** on every layout. That number
+came from `lb_se.py` -- the level at which the BOARD can distinguish two files. The relevant
+quantity is different: the level at which VALIDATION can predict the board, and on this evidence
+that is somewhere above 0.003, ten times higher.
+
+Everything adopted on a margin between 0.0003 and 0.003 was therefore adopted on noise. Looking
+back, that is exactly the set of decisions that failed: the calibration (adopted, cost 0.00036), the
+soil profile (adopted on all three layouts, cost 0.0027), and this smoothing tweak (cost 0.00012).
+The two changes that ever paid were both far above the line: the anomaly encoding at 0.0156 and the
+decision to smooth at all at 0.0037.
+
+The horizon-1 splice at beta=0.50 sits in the dead zone too -- validation -0.0005, never tested
+alone on the board -- so it should be regarded as unverified rather than as an adopted stage. It is
+in the 0.692657 file and it stays there, because that file's score is a measurement and taking the
+splice out would be another change in the range that does not transfer.
+
+## What this closes
+Post-processing is finished. Every remaining lever in it -- smoothing weight, radius, iterations,
+splice weight, calibration, seasonal offsets -- moves validation by less than 0.001, which is inside
+the range where validation has never predicted the board's sign. Continuing to spend submissions
+there is not optimisation, it is sampling noise at one file per day.
