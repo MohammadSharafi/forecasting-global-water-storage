@@ -139,6 +139,25 @@ if os.environ.get("DEADF","")=="1":
 X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
 if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)   # no recent-year emphasis (test regime differs from the last training years)
+if "analog" in os.environ.get("WEIGHTS","ramp"):
+    # Analogue weighting. Session 3 established that ONI as a FEATURE makes both layouts worse:
+    # a single global index per month is used by the trees as a month identifier, and a handful of
+    # ENSO cycles is not enough to learn from. This is a different mechanism -- the model never
+    # sees the index. It only shifts how much each training row counts, toward rows whose ENSO
+    # state resembles the window being predicted, which is the analogue method that seasonal
+    # forecasting has used for decades.
+    # Compliance: ONI at month t is published at t, and the target-window regime is an aggregate
+    # of covariate state, never of the target. No value at t+1 or later enters.
+    _oni = pl.read_parquet("external/oni.parquet")
+    _vt = pl.scan_parquet(f"out/mats/{L}_va.parquet").select("time").unique().collect()
+    _tgt = float(_vt.join(_oni, on="time", how="left")["oni"].mean())
+    _s = float(os.environ.get("ANALOG_S","0.75"))
+    _m = dict(zip(_oni["time"].to_list(), _oni["oni"].to_list()))
+    _o = np.array([_m.get(d, np.nan) for d in tr["time"].to_list()], dtype=np.float64)
+    _aw = np.exp(-np.abs(_o-_tgt)/_s); _aw = np.where(np.isfinite(_aw), _aw, 1.0); _aw /= _aw.mean()
+    print(f"  analog weighting: target ONI {_tgt:+.2f}, scale {_s}, "
+          f"row weight {_aw.min():.2f}..{_aw.max():.2f}",flush=True)
+    w = (w*_aw).astype(np.float32)
 if os.environ.get("HMIX","")=="test":
     # reweight training rows to the real test horizon mix (blocks 1,3,4,7,1,2). The sampler
     # draws h1 at 34% then h2..h7 uniformly at 11% each, so h5-h7 are oversampled about 2x and

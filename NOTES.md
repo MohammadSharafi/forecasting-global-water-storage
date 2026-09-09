@@ -2219,3 +2219,67 @@ which costs nothing: a worse submission cannot lower the displayed best score.
 FINAL is training overnight on `FINALvn` with `DROPF='bigsa,gdo'`, rounds 410/230 and the h=1 splice
 at beta=0.50 -- every setting identical to the file that scored 0.692657, so the feature encoding is
 the only thing that differs. `out/scored/sub_q_main.csv` is untouched.
+
+# Session 10m — a night of research: eight ideas, seven killed, one survivor
+
+Every test below was chosen to be the CHEAPEST thing that could falsify its idea, and all but one
+cost no training at all -- they run on predictions that already exist.
+
+## 1. Per-cell reliability, carried across time  -- the biggest prize, and it is not there
+The per-cell shrinkage oracle is -0.039 to -0.049, twenty times anything else measured in this
+project. The question is whether lambda_c is a stable property of a cell or an artefact of the
+window. Fitted on two layouts, applied to the held-out third:
+
+    tau (shrinkage toward global)    A          B          C
+    0                           +0.01423   +0.02048   +0.01053
+    5                           +0.00224   +0.00519   -0.00195
+    100                         -0.00090   +0.00060   -0.00338
+
+Unshrunk it is catastrophic; only when shrunk almost entirely to the global constant does it stop
+hurting, and even then B is positive. **Per-cell reliability does not transfer across time.** The
+-0.04 ceiling is period-specific noise, and the whole per-cell avenue is closed.
+
+## 2. Ensemble disagreement as a reliability signal  -- the spread-skill relationship is absent
+Standard practice in ensemble forecasting. Here corr(|lgb - xgb|, |error|) is +0.076, +0.083, +0.116,
+and the fitted lambda per disagreement bin is flat (1.08 -> 1.02 across ten bins). Held out it fails
+on B. Where models disagree is not where they are wrong, in this problem.
+
+## 3. Analogue / regime training weights  -- the one idea that cost training, and it lost
+Distinct from session 3's ONI-as-a-feature failure: the model never sees the index, only the row
+weights change, which is the analogue method seasonal forecasting has used for decades. The regime
+shift is real -- 22.2% of test months have ONI > 1.0 against 9.4% of training months, and the model
+carries a -0.164 and -0.085 El Nino bias on B and C.
+
+    WEIGHTS=ramp,analog vs ramp     A +0.0036     B +0.0012
+    (SUB=0.4, two seeds, paired arms, ANALOG_S=0.75)
+
+Worse on both, killed before layout C. Down-weighting non-analogue months costs more effective
+sample size than the regime match buys: ~160 months is too few to spend on similarity.
+
+## 4. A full representation audit  -- no second bug of the r2/cpc kind
+Ranked every feature by sd(per-cell mean)/sd(overall). The high-ratio survivors are `csd`, `cmean`,
+`mad1`, `ac1`, `dy_sd`, `clim_next`, and the per-cell response coefficients `b_spei1`, `r_sm`,
+`rr_dsm`. Those are per-cell CONSTANTS by design -- their purpose is to locate the cell, and
+standardising them would delete exactly the information they carry. After the NCEP-R2 and CPC fix
+the representation is clean.
+
+## 5. Blending the two encodings  -- monotone, so nothing to gain
+Old-encoding and new-encoding predictions on identical rows: w(new) = 0.5 -> +0.00053, 0.8 ->
++0.00007, 1.0 -> best. The two are far too correlated for averaging to buy anything, which is the
+same lesson the capacity blends and the analytic blend bound already gave.
+
+## 6. A GRACE / GRACE-FO era offset  -- real difference, wrong explanation
+Observed TWS at the unmasked test anchors minus the GRACE-era climatology: -0.224 over the 2015-16
+anchors against -0.043 over the 2018 ones, a +0.18 jump. That is not an instrument offset, it is the
+record 2015-16 El Nino drought against a near-normal 2018 -- and the model is GIVEN those anchors as
+`tws_known`, so it already knows. Nothing to correct.
+
+## 7-8. Already dead before tonight
+Post-hoc rescaling in every parameterisation tried: global lambda, per-horizon (board-refuted at
++0.00036), per-cell (1), per-variability-bin (-0.0013, sub-threshold), per-disagreement-bin (2).
+That family is exhausted. ONI as a feature was killed in session 3 with a mechanism.
+
+## What survives
+The NCEP-R2 + CPC + SPEI anomaly encoding, -0.0022 on all three layouts, is the only live result and
+is training. Nothing found tonight beats it, and the seven kills cost about three hours of analysis
+and twenty minutes of training between them.
