@@ -15,7 +15,7 @@ from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, era5_feats
 from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP
-from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE
+from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE, NCEP2_STORAGE, NCEP2_FLUX, CPC_STORAGE, SPEI_STORAGE
 from features_scale import add_scale, SCALE
 from features_gdo import load_gdo
 
@@ -25,7 +25,9 @@ from features_gdo import load_gdo
 # out/mats/<name>_*.parquet and leaves the cached A_*/FINAL_* matrices untouched, which is what
 # makes it safe to sweep a parameter that changes every matrix on a machine holding a working
 # submission.
-_LNAME = re.compile(r"(FINAL|[ABC])(?:p(\d+))?(e)?$")
+# ...and a trailing "v<tag>" namespaces the files without changing what is built, so a feature
+# change that has to be measured against the cached matrices can build its own set beside them.
+_LNAME = re.compile(r"(FINAL|[ABC])(?:p(\d+))?(e)?(?:v[a-z0-9]+)?$")
 
 
 def _parse(L):
@@ -97,13 +99,19 @@ def prepare(L, t0=None):
     # modelled total water storage: soil water + snow, the predictor the literature ranks first
     ERA = add_mtws(ERA, "e5SW", "e5SWE", "e5MTWS", 1000.0)   # e5SW is metres of water, e5SWE is mm
     nc = add_mtws(nc, "SW", "SWE", "MTWS")                   # both already mm
+    nc2 = add_mtws(nc2, "r2SW", "r2SWE", "r2MTWS")           # same, for the R2 stream
     E5S = [c for c in ERA5_STORAGE if ERA is None or c in ERA.columns]
     ANOM = [x for x in (anom_build(ERA, E5S, ERA5_FLUX, HM),
                         anom_build(nc, NCEP_STORAGE, NCEP_FLUX, HM),
                         anom_build(cov_all.select(["lat", "lon", "time"]+COV_STORAGE).unique(["lat", "lon", "time"]), COV_STORAGE, [], HM),
                         # SPI and fAPAR are indices/levels, so storage-like: z-scored value at t
                         # and at t_known, their difference, and the 3/6/12-month antecedent windows
-                        anom_build(gdo, gcols, [], HM)) if x is not None]
+                        anom_build(gdo, gcols, [], HM),
+                        # NCEP-R2 and CPC: raw levels since session 8, never standardised
+                        anom_build(nc2, [c for c in NCEP2_STORAGE if c in nc2.columns], NCEP2_FLUX, HM),
+                        anom_build(cpc, CPC_STORAGE, [], HM),
+                        # the released SPEI columns, whose per-cell seasonal bias survives
+                        anom_build(cov_all.select(["lat", "lon", "time"]+SPEI_STORAGE).unique(["lat", "lon", "time"]), SPEI_STORAGE, [], HM)) if x is not None]
     print("anomaly tables:", [(len(sz), len(fz)) for _, sz, fz in ANOM], f"({time.time()-t0:.0f}s)", flush=True)
 
     def featfn(rows, obs, loyo):

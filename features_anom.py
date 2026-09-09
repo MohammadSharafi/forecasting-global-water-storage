@@ -150,6 +150,16 @@ ERA5_FLUX = ["e5P", "e5E", "e5R", "e5PER"]
 NCEP_STORAGE = ["SW", "SWE", "MTWS"]
 NCEP_FLUX = ["P", "E", "R", "PER"]
 COV_STORAGE = ["SOIL_MOISTURE_t"]        # SPEI is already a standardised index; soil moisture is not
+# NCEP-R2 and CPC were never passed to anom_build, so their 24 level features are raw millimetres
+# and fractions -- the exact encoding the session-9 finding was about. Measured on A_va, the ratio
+# sd(per-cell mean)/sd(overall) is 0.77-1.01 for these columns against 0.28-0.36 for the encoded
+# ones, and none of them appears in any top-gain list.
+NCEP2_STORAGE = ["r2SW", "r2SWE", "r2MTWS"]
+NCEP2_FLUX = ["r2P", "r2E", "r2R", "r2PER"]
+CPC_STORAGE = ["cpcSW"]
+# the SPEI columns are standardised in the large, but their per-cell CALENDAR-MONTH means still
+# run to +-0.9 with an sd of 0.24, which is what a per-cell-per-month climatology removes
+SPEI_STORAGE = ["SPEI_01_t", "SPEI_03_t", "SPEI_06_t", "SPEI_12_t"]
 PFX = "an_"                              # every feature built here starts with this, so it can be ablated
 
 

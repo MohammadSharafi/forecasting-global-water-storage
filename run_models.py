@@ -75,6 +75,9 @@ DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "r2anom" in DROPF:   F=[f for f in F if not f.startswith("an_r2")]
+if "cpcanom" in DROPF:  F=[f for f in F if not f.startswith("an_cpc")]
+if "speianom" in DROPF: F=[f for f in F if not f.startswith("an_SPEI")]
 if "e5prof" in DROPF:
     # the split soil layers share the e5/an_ prefixes with the rest of the ERA5 block, so without
     # their own switch their contribution could not be measured separately from it
