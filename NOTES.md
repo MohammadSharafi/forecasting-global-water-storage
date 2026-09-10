@@ -2538,3 +2538,49 @@ smooth state.**
 A full h=1 specialist at the same capacity scores 0.6163 against the general model's 0.6191 -- 0.003
 for a model trained on nothing but h=1 rows. h=1 is information-limited, not capacity-limited, and
 the information that is missing is next month's weather, which the rules place out of reach.
+
+# Session 10s — why nothing transfers: the gate is far weaker than it looks
+
+## Variance weighting: rejected
+The suggestion to weight training rows by local TWS variability, on the argument that the metric's
+error is concentrated in variable cells (most variable decile 19.2% of MSE, steadiest 1.4%):
+
+    layout A  +0.00090      layout B  -0.00230      layout C  -0.00040
+
+Mixed in sign, so the every-layout rule refuses it. Worth noting it is also formally a mismatch:
+the metric is pooled RMSE, whose own objective is uniform weights.
+
+## The finding that matters more
+Four ideas in a row have now died, and the two that were ADOPTED transferred at 5% (validation
+-0.0091, board -0.00047). The explanation is not in any single idea. It is the gate.
+
+    layout A   18 months   2012-07 .. 2015-08
+    layout B   20 months   2009-10 .. 2012-08
+    layout C   18 months   2009-01 .. 2012-04
+
+    A and B share 2 months.   B and C share 6 months.   B and C are the same era.
+
+"Wins on all three layouts" sounds like three independent tests. It is closer to **two**: one window
+in 2012-2015 and one in 2009-2012, sampled twice. A null change passes two independent coin flips
+25% of the time.
+
+Against that gate this project has now tested on the order of twenty ideas. At 25% per test the
+expected number of false adoptions is about five. We adopted two recently, and both transferred at
+5% of their validation size. That is exactly what adopting noise looks like -- not a failure of any
+particular idea, but a multiple-comparisons problem that has been running for several sessions.
+
+It also explains the pattern in the transfer table. The covariate-anomaly encoding was worth -0.0156,
+far outside anything selection could manufacture, and it transferred at 83%. Everything since has
+been in the 0.002-0.009 range, which is exactly the range a weak gate produces by chance, and
+nothing since has transferred.
+
+## What follows
+The training record runs 2002-05 to 2015-08, and only two eras are used. Windows over 2003-2006 and
+2006-2009 are available and genuinely independent of both existing eras. Five or six independent
+layouts would take the false-adoption rate from 25% to about 3%, and would say which of the recent
+adoptions are real.
+
+That is the honest next step, and it is a methodological one rather than a modelling one: the
+constraint on this project is no longer ideas, it is the ability to tell a real idea from a lucky
+one. Sampling more ideas against the current gate makes the submission worse in expectation, not
+better.
