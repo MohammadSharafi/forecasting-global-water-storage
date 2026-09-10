@@ -14,7 +14,7 @@ from features6 import add_recent, RECENT, LONGTERM
 from features_ncep import load_ncep, add_ncep
 import glob
 from features_era5 import load_era5, add_era5, era5_feats
-from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP, add_anwide
+from features_x import load_ncep2, load_cpc, add_ext, add_wide4, WIDE4, add_covwin, COVWIN, cell_response, add_response, RESP, add_anwide, add_anwide_multi
 from features_anom import build as anom_build, add_anom, add_anom_windows, add_mtws, ERA5_STORAGE, ERA5_FLUX, NCEP_STORAGE, NCEP_FLUX, COV_STORAGE, NCEP2_STORAGE, NCEP2_FLUX, CPC_STORAGE, SPEI_STORAGE
 from features_scale import add_scale, SCALE
 from features_gdo import load_gdo
@@ -127,7 +127,11 @@ def prepare(L, t0=None):
             r, f = add_anom(r, at, sz, fz); AF += f
             r, f = add_anom_windows(r, at, fz, sz); AF += f   # 3/6/12-month antecedent windows ending at t
         # regional means of the covariate-anomaly block: the scale our error actually lives at
-        r, AW = add_anwide(r, radius=int(os.environ.get("ANWIDE_R", "4")))
+        _rad = os.environ.get("ANWIDE_R", "4")
+        if "," in _rad:
+            r, AW = add_anwide_multi(r, radii=tuple(int(x) for x in _rad.split(",")))
+        else:
+            r, AW = add_anwide(r, radius=int(_rad))
         F = FEATS2+AR+WIDE+RECENT+NF+NF2+NF3+WIDE4+COVWIN+RESP+EF+AF+SCALE+AW
         F = list(dict.fromkeys(F)); return r, F
 

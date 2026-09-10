@@ -85,7 +85,20 @@ ANWKEYS = ["an_e5PERz_acc", "an_e5Pz_acc", "an_e5Ez_acc", "an_e5PERz_w3", "an_e5
            "an_SOIL_MOISTURE_tz_d"]
 
 
-def add_anwide(r, radius=4, keys=None):
+def add_anwide_multi(r, radii=(2, 4, 8), keys=None):
+    """Several radii at once. One radius forces a single choice of scale on every cell and every
+    horizon, and the right scale is not the same for both: the correlation scan peaked at r=4
+    overall (0.177 cell, 0.208 r=1, 0.225 r=2, 0.242 r=4, 0.232 r=8, 0.190 r=16), but that is an
+    average over horizons, and a 7-month-stale anchor plausibly wants a wider box than a 1-month
+    one. Offering two or three lets the model choose per split instead."""
+    F = []
+    for rad in radii:
+        r, f = add_anwide(r, radius=rad, keys=keys, suffix=f"_r{rad}")
+        F += f
+    return r, F
+
+
+def add_anwide(r, radius=4, keys=None, suffix=""):
     """Neighbourhood means of the covariate-anomaly block, same machinery as add_wide4."""
     from scipy.ndimage import uniform_filter
     keys = [k for k in (keys or ANWKEYS) if k in r.columns]
@@ -103,7 +116,7 @@ def add_anwide(r, radius=4, keys=None):
         S=uniform_filter(arr,size=size,mode=("constant","constant","wrap"))*k2
         Cc=uniform_filter(c,size=size,mode=("constant","constant","wrap"))*k2
         m=np.where(Cc>0.5,S/np.maximum(Cc,1e-6),np.nan)
-        out["aw_"+k]=m[pid,li,lo]
+        out["aw_"+k+suffix]=m[pid,li,lo]
     return r.with_columns([pl.Series(k,v) for k,v in out.items()]), list(out)
 
 def add_covwin(r, cov_all):

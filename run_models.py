@@ -76,6 +76,9 @@ if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
 if "anwide" in DROPF:    F=[f for f in F if not f.startswith("aw_")]
+# one switch per radius, so "does a second scale help" is measurable on a single matrix
+for _r in ("2","4","8","16"):
+    if "aw"+_r in DROPF: F=[f for f in F if not f.endswith("_r"+_r)]
 if "r2anom" in DROPF:   F=[f for f in F if not f.startswith("an_r2")]
 if "cpcanom" in DROPF:  F=[f for f in F if not f.startswith("an_cpc")]
 if "speianom" in DROPF: F=[f for f in F if not f.startswith("an_SPEI")]
