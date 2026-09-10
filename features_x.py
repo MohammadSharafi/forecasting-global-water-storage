@@ -82,7 +82,13 @@ WIDE4=["w4_"+k for k in WKEYS]+["w4_n"]
 # scale that matters is the regional one -- and no aggregate of an_* existed at all.
 ANWKEYS = ["an_e5PERz_acc", "an_e5Pz_acc", "an_e5Ez_acc", "an_e5PERz_w3", "an_e5PERz_w6",
            "an_e5SWz_d", "an_e5MTWSz_d", "an_PERz_acc", "an_SWz_d", "an_MTWSz_d",
-           "an_SOIL_MOISTURE_tz_d"]
+           "an_SOIL_MOISTURE_tz_d",
+           # TWS-derived quantities that had NO regional aggregate of any radius. `anom_persist`
+           # is the model's highest-gain feature at 9.4% and had none; `d1` is the one-month
+           # momentum, which is the only thing that carries at h=1 -- where the accumulation
+           # window is empty, the skill ratio against persistence is the worst of any horizon
+           # (0.86-0.88 on all three layouts) and a third of the test weight sits.
+           "d1", "d3", "d12", "trend_persist", "anom_persist"]
 
 
 def add_anwide_multi(r, radii=(2, 4, 8), keys=None):
