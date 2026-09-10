@@ -2400,3 +2400,58 @@ Neither was a modelling failure; both were representation failures.
 (0.177 at the cell, 0.208 at r=1, 0.225 at r=2, **0.242 at r=4**, 0.232 at r=8, 0.190 at r=16), so
 it sits at the measured optimum, but only ONE radius is offered. Giving the model two or three
 radii at once is the obvious next step and was not tried for lack of time.
+
+# Session 10p — the board result, and the most likely explanation for the gap to 0.623
+
+    sub_v_anwide   0.692189463   against 0.692657   -0.000468, a new best
+
+Validation said -0.0091 across three layouts; the board paid -0.00047, a transfer of 5%. The RMS
+distance between the two files is 0.0959, so a readable gap needs 0.00083 -- the improvement is a
+point estimate, not a measurement. Two representation fixes that each won on every layout bought
+essentially nothing on the test.
+
+## What was ruled out first
+  * the framing: `target(t)` is exactly `TWS_t(t+1)`, max difference 0.0 over 1.98M rows;
+  * the features are populated on the test rows -- the only zeros are the h=1 anchor months where
+    the accumulation window is empty by construction, which is correct;
+  * a U-Net on the global field (torch, existing run_cnn.py) plateaus at 0.675 plain against the
+    gradient-boosted model's 0.621, and it is data-starved by construction: one sample per
+    (time, t_known) pair is **191 training images**, where the tree sees 2.97M rows;
+  * coordinates, excluded by rule, are worth -0.0011.
+
+## The likely explanation: the covariates at t+1 are in Test.csv, unmasked
+`Test.csv` masks **`TWS_t` only**. Every other column -- SPEI at 1/3/6/12 months and soil moisture --
+is given for all 18 test months. And for **12 of the 18 months the target month t+1 is itself a test
+month**, so the covariates describing the month being predicted are sitting in the file for
+**187,408 rows, 66.7% of the test**.
+
+They are far more informative than the same columns at t, exactly as the physics says -- the rain
+that falls during month t+1 is what changes storage into t+1:
+
+    correlation with the one-month TWS change
+      SPEI_01 at t     -0.051        SPEI_01 at t+1    +0.231
+      SPEI_03 at t     -0.066        SPEI_03 at t+1    +0.087
+      SOIL_MOIST at t  -0.059        SOIL_MOIST at t+1 +0.074
+
+A **linear** correction of our residual from just those five columns at t+1, fitted on two layouts
+and scored on the held-out third: **-0.0023, -0.0107, -0.0036, mean -0.0055**. A full nonlinear
+treatment -- their anomalies, windows and neighbourhood aggregates, the whole machinery this project
+already has for the columns at t -- would be a multiple of that. That is the right order of
+magnitude to explain a gap of 0.07 that nothing else in six sessions of measurement has explained.
+
+## This project has already refused this once
+Session 9: "An earlier version smoothed each prediction along the horizon within a block, which
+indirectly used covariates at t+1; it was removed even though the causal replacement scores worse,
+because the gain came entirely from the non-causal direction." REPORT §5 states the rule as "No
+information from t+1 or later" and the compliance audit enforces `t_known <= t`.
+
+Whether that reading is right is a question about the competition's rules, not about the data, and
+it is genuinely arguable both ways:
+
+  * AGAINST using it -- the stated rule prohibits information from t+1 or later, and the top entries
+    go to a code and trustworthiness review where a violation would be found;
+  * FOR using it -- the organisers masked TWS and deliberately did not mask the covariates, they
+    supplied all 18 test months, and using every column of a provided test file is ordinary
+    transductive practice in tabular competitions.
+
+No submission has been built from it. That decision belongs to the entrant, who has the rule text.
