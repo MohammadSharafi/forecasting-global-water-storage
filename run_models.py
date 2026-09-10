@@ -104,7 +104,7 @@ def base_of(df):
     if AT=="decay":
         lam=RHO**df["horizon"].to_numpy().astype(np.float64); return lam*k+(1.0-lam)*c
     raise SystemExit(f"unknown ANCHOR_TARGET={AT}")
-tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
+tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon","csd"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3])))
 if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
 if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
@@ -143,6 +143,16 @@ if os.environ.get("DEADF","")=="1":
 X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
 yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
 if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)   # no recent-year emphasis (test regime differs from the last training years)
+if "var" in os.environ.get("WEIGHTS","ramp").split(","):
+    # Weight each training row by its cell's TWS variability. The metric is pooled RMSE, so the
+    # unweighted objective is the metric's own objective and this is formally a mismatch -- but
+    # analyze.py measures that the most variable decile of cells carries 19.2% of MSE and the
+    # steadiest 1.4%, so with finite capacity it may still pay to spend it where the errors are.
+    _v = tr["csd"].to_numpy().astype(np.float64)
+    _v = np.where(np.isfinite(_v) & (_v > 0), _v, np.nanmedian(_v))
+    _v = _v / _v.mean()
+    print(f"  variance weighting: row weight {_v.min():.2f}..{_v.max():.2f}", flush=True)
+    w = (w * _v).astype(np.float32)
 if "analog" in os.environ.get("WEIGHTS","ramp"):
     # Analogue weighting. Session 3 established that ONI as a FEATURE makes both layouts worse:
     # a single global index per month is used by the trees as a month identifier, and a handful of

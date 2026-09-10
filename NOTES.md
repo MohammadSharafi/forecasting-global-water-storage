@@ -2495,3 +2495,46 @@ is 0.781 on the board against 0.83 / 0.77 / 0.72 on layouts A / B / C -- we perf
 relative to the baseline. A competitor at 0.623 has a skill ratio of 0.703, better than any of our
 layouts. So the gap is genuine forecasting skill, not an artefact of a harder test set, and not
 anything found in this investigation.
+
+# Session 10r — h=1 is where the weight is, and it is information-limited
+
+## Where the remaining headroom sits
+Skill ratio (our RMSE / persistence RMSE) by horizon, on the shipped configuration:
+
+    layout      h1      h2      h3      h4      h5      h6      h7
+    A        0.873   0.775   0.732   0.870   0.892   0.896   0.688
+    B        0.862   0.795   0.743   0.747   0.650   0.700   0.651
+    C        0.876   0.789   0.710   0.661   0.618   0.606   0.589
+    test wt  0.333   0.222   0.167   0.111   0.056   0.056   0.056
+
+**h=1 is the worst horizon on every layout and carries a third of the test weight.** If it merely
+matched h7's ratio, validation would go 0.6331 -> 0.5938 on A, 0.5240 -> 0.4899 on B and
+0.5169 -> 0.4779 on C: -0.034 to -0.039, which is the magnitude the gap to the leaders needs.
+
+There is a structural reason it is the worst, and it is not a modelling failure. At h=7 the model
+observes covariates for six of the seven months between the anchor and the target, so most of the
+driving weather is known. At h=1 it observes **none** of the single month that drives the change --
+that month is t+1. The one thing that could carry, momentum, is weak.
+
+## Two attempts at it, both dead
+`d1` (one-month momentum), `d3`, `d12`, `trend_persist` and `anom_persist` had **no regional
+aggregate at any radius**, which was surprising -- `anom_persist` is the model's highest-gain
+feature at 9.4%. Adding them, and offering three radii instead of one:
+
+    layout B    shipped 0.5259
+                + TWS-momentum aggregates at r=4    0.5251   -0.0008
+                + radii 2, 4 and 8 as well          0.5254   +0.0003
+
+Both dead. The contrast with the covariate-anomaly aggregates (-0.0069) is the informative part:
+aggregating the FORCING regionally helped because reanalysis P-E-R errors are independent between
+cells and average out. Aggregating TWS-derived quantities does not, because the TWS field is already
+smooth -- blurring the true target over its neighbours costs only 0.0619 -- so a neighbourhood mean
+of `d1` is very nearly `d1` itself and carries no new information.
+
+That is a clean statement of when regional aggregation pays: **aggregate a noisy driver, not a
+smooth state.**
+
+## The capacity question
+A full h=1 specialist at the same capacity scores 0.6163 against the general model's 0.6191 -- 0.003
+for a model trained on nothing but h=1 rows. h=1 is information-limited, not capacity-limited, and
+the information that is missing is next month's weather, which the rules place out of reach.
