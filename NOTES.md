@@ -2455,3 +2455,43 @@ it is genuinely arguable both ways:
     transductive practice in tabular competitions.
 
 No submission has been built from it. That decision belongs to the entrant, who has the rule text.
+
+# Session 10q — the t+1 hypothesis, measured properly, is NOT the explanation
+
+The diagnostic was built in the scratchpad, never imported by the pipeline, and deleted once the
+number was recorded. Nothing prohibited exists in the repository or in any submission.
+
+A gradient-boosted residual model on the full t+1 covariate family -- the five released columns at
+t+1, their per-cell seasonal z-scores and their change from t -- fitted on two layouts and scored
+on the held-out third:
+
+    layout   compliant   with t+1    gain
+    A           0.6331     0.6365   +0.00338
+    B           0.5240     0.5143   -0.00970
+    C           0.5169     0.5177   +0.00081
+    mean                            -0.00184
+
+Mixed in sign, and worse on two of three layouts. The earlier -0.0055 from a linear fit was almost
+entirely layout B. **Covariates at t+1 are not worth anything like 0.07**, so they do not explain
+the gap and the compliance restriction is not what is costing us. That is worth knowing in both
+directions: it removes the temptation, and it removes the excuse.
+
+## Two further explanations tested and rejected
+**Standardisation leakage.** The per-cell mean over training correlates **-0.4632** with the mean
+over the six unmasked test anchors, where persistence predicts a positive number -- the signature of
+a demeaning window spanning both periods, which would constrain the test values. The control kills
+it: the same statistic computed entirely inside the training record, first 137 months against the
+last 6, is **-0.3255**. It is a property of the standardisation, present in the training data, not
+information about the test era.
+
+**A more variable test era.** Per-cell sd over the six test anchors against the training sd has a
+median ratio of **0.826** -- the test era is if anything less variable per cell, so there is no case
+for scaling predicted changes up. The pooled ratio of 1.048 is between-cell spread, not within-cell.
+
+## What is real, and unexplained
+The test era does have larger month-to-month changes than the validation windows: persistence scores
+0.886 on the board against 0.762 on layout A, a ratio of 1.16. Our skill ratio against persistence
+is 0.781 on the board against 0.83 / 0.77 / 0.72 on layouts A / B / C -- we perform normally
+relative to the baseline. A competitor at 0.623 has a skill ratio of 0.703, better than any of our
+layouts. So the gap is genuine forecasting skill, not an artefact of a harder test set, and not
+anything found in this investigation.
