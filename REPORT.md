@@ -5,9 +5,9 @@ one-degree land cells when the current-month TWS is hidden for two-thirds of tes
 
 > Every number in this report is either a public-leaderboard result or a validation measurement
 > produced by a named script in this repository, and each is reproducible with the command given in
-> §7. The one figure not yet available is the final submission's own leaderboard score, marked
-> *awaiting score* in §8: the day's submission allowance was spent before the run that produced
-> that file finished.
+> §7. Where a validation result and the leaderboard disagree, both are shown and the leaderboard is
+> treated as the answer — §2 sets out what that disagreement turned out to be worth, and §4 records
+> the avenues it closed.
 
 ## 1. Problem structure
 
@@ -28,12 +28,34 @@ than by the seasonal cycle.
 
 ## 2. Validation that mirrors the test, and how changes are accepted
 
-**Three pseudo-test layouts** are carved from the training years with the same block-and-mask
+**Five pseudo-test layouts** are carved from the training years with the same block-and-mask
 structure. A (2012–2015) and B (2009–2012) were built first; **C reproduces the test's exact block
 pattern `[1,3,4,7,1,2]` at the test's exact spacing**, searched over every placement the training
 record can carry gap-free, because GRACE has real data gaps and a hardcoded offset silently
-truncated blocks — producing a layout that could not score four of the seven horizons. `validation_c.py`
-now exits non-zero rather than let such a layout become a vote.
+truncated blocks — producing a layout that could not score four of the seven horizons.
+`validation_c.py` now exits non-zero rather than let such a layout become a vote.
+
+D and E were added last, and the reason they exist is a defect in the gate rather than in any model.
+"Wins on all three layouts" sounds like three independent tests; it was not. B's window is
+2009-10…2012-08 and C's is 2009-01…2012-04, they share six block months, and both sample the same
+era — so the rule was closer to **two** tests than three, and a null change passes two coin flips
+25% of the time. Against that gate this project had by then tried roughly twenty ideas.
+
+`validation_extra.py` places the test's geometry at a *chosen* anchor rather than the latest one,
+because the point is to cover an era the others do not:
+
+| layout | window | history | block months shared with A, B, C |
+|---|---|---|---|
+| A | 2012-07…2015-08 | 111 | — |
+| B | 2009-10…2012-08 | 84 | 2 with A |
+| C | 2009-01…2012-04 | 75 | 6 with B |
+| **D** | **2005-09…2008-12** | 35 | **none** |
+| **E** | **2007-09…2010-12** | 59 | 1 with B, 4 with C |
+
+All five reproduce the test's horizon mix to three decimals. D and E have shorter histories, so
+their models are weaker in absolute terms; that is acceptable for a gate, where both arms of a
+comparison carry the same handicap and only the contrast is read. Every layout is **extrapolation**,
+never interpolation: each one's history ends before its window begins, as the real task's does.
 
 Two measurement corrections matter more than any model change:
 
@@ -69,16 +91,24 @@ rather than an artifact.
   | ERA5 soil profile (§3.2b) | −0.0036 | **+0.0027** | no — sign inverted |
   | per-horizon calibration | −0.0005 | **+0.0004** | no — sign inverted |
   | smoothing 0.7/it1 → 0.5/it2 | −0.0001 | **+0.0001** | no — sign inverted |
+  | NCEP-R2/CPC encoding + regional anomaly means (§3.2c) | −0.0091 | −0.0005 | direction held, 5% of size |
 
-  Two changes above 0.0037 transferred, at a consistent 0.77–0.83 of their validation size. Three
-  changes below 0.0036 inverted. Five points is not a law, but it has never gone the other way, and
-  it says the honest adoption threshold for this problem is nearer **0.003** than 0.0003 — ten times
-  stricter than the rule actually used. Every decision taken on a margin inside that band was taken
-  on noise, and those are precisely the decisions that failed on the board.
+  Two changes above 0.0037 transferred at 0.77–0.83 of their validation size. Three below 0.0036
+  inverted. The sixth is the interesting one: it is the best-evidenced change this project has made —
+  it wins on **five** independent validation windows, two of which no decision has ever seen — and
+  the board still paid only 5% of it. So the rule is not simply a threshold on magnitude. Something
+  about the 2015–2019 test period compresses gains that are robust across 2005–2015, and §4 records
+  the five mechanisms that were tested for it and rejected.
+
+  The practical consequence for a reader of this report is a caution rather than a recipe: **treat
+  every validation gain here below about 0.003 as unproven**, and note that the project's own
+  adoption threshold of 0.0003 was ten times too permissive for most of its history.
 
 The standing rule is that a change must win on **every** layout it was run on. `select_config.py`
 applies it to four independent decisions (feature groups, model capacity, sample weighting, training
-horizon mix) and keeps the incumbent otherwise.
+horizon mix) and keeps the incumbent otherwise. With five layouts that rule is worth roughly what it
+appears to be worth; with the three it had for most of this project's history, and two of those from
+one era, it was not — which is the correction §2 records and the reason D and E exist.
 
 ## 3. What actually produced the score
 
@@ -116,7 +146,13 @@ synthetic data where the answer is known — with a true correlation of 0.844, t
 pooled across cells on raw totals. The conclusion that closed this avenue for four sessions rested
 on an encoding artifact, not on the data.
 
-### 3.2b The second finding: every soil product was throwing its profile away
+### 3.2b A finding validation accepted and the leaderboard refused — and it is not in the model
+
+This section is kept in §3 rather than §4 because it is the clearest single illustration of the
+caution in §2, and because a reader is entitled to see a change this project believed in and was
+wrong about. **The soil profile is not in the submitted file.** It won on every validation layout by
+8 to 17 times the adoption threshold and the leaderboard then scored it 0.695366 against 0.692657 —
+worse by 0.0027, in the opposite direction and larger than predicted.
 
 `features_era5` collapsed ERA5's four `swvl` layers into one column by a fixed-thickness weighted
 sum; `features_ncep` and `features_x` do the same to NCEP-R1's and R2's two layers. Across 266
@@ -134,9 +170,10 @@ passing them through the same per-cell standardisation as every other storage va
 | + profile + GDO SPI | 309 | 0.6376 | 0.5318 | 0.5248 | −0.0037 |
 
 All four arms were trained on **one matrix**, so the only difference between them is which features
-the model was offered. The profile wins on every layout by 8 to 17 times the adoption threshold —
-second only to the covariate-anomaly encoding in this project's history — and at six of seven
-horizons on A, five on B and all seven on C.
+the model was offered. The profile wins on every layout by 8 to 17 times the adoption threshold and
+at six of seven horizons on A, five on B and all seven on C. The mechanism is physical and the
+measurement was clean. It still did not transfer, and no amount of care in the experiment would have
+revealed that in advance — only the submission did.
 
 Copernicus GDO's long-window SPI (24 and 48 months, GPCC-based, §5) was measured in the same run and
 **not adopted**: its marginal value on top of the profile is −0.0002, +0.0005, −0.0008, so it loses
@@ -145,15 +182,56 @@ on one layout and its mean is inside seed noise. The likely reason is visible in
 that SPI-48 indexes, so the profile carries the same information closer to the target and per cell
 rather than as a basin-scale index.
 
+### 3.2c The third finding: the covariates were offered at only one spatial scale
+
+Two blocks were still raw levels. `build_mats` passed ERA5, NCEP-R1, soil moisture and GDO through
+the per-cell standardisation of §3.1 and **never passed NCEP-R2 or CPC**, so 24 features remained
+raw millimetres and volumetric fractions — the §3.1 bug, four sessions after §3.1. The diagnostic is
+the ratio sd(per-cell mean) / sd(overall): 0.77–1.01 for those columns against 0.28–0.36 for encoded
+ones, and **not one of the 24 appeared in any top-gain list**, which is what a feature the model
+cannot read looks like.
+
+The larger half came from asking *at what scale* the information was offered. Three measurements
+point at the same place:
+
+- blur the **true** target over its eight neighbours and it scores **0.0619** — the signal is
+  spatially coherent;
+- blur **our error** the same way and **98.2%** of its variance survives — the error is regional;
+- the accumulated water-balance anomaly correlates **0.177** with the TWS change at the cell and
+  **0.242** over a 9×9 box, because reanalysis P−E−R errors are largely independent between cells
+  and average out while the TWS signal does not.
+
+So the one quantity that physically drives TWS change is most trustworthy at exactly the scale the
+error lives at — and of the 25 wide and neighbourhood features, **none** aggregated the `an_*` block.
+`add_anwide` supplies neighbourhood means of eleven anomaly columns at radius 4.
+
+| | A | B | C | **D** | **E** |
+|---|---|---|---|---|---|
+| both fixes, against the previous feature set | −0.0040 | −0.0072 | −0.0096 | **−0.0068** | **−0.0130** |
+
+Five layouts, of which D and E were built *after* the decision and D shares no block month with any
+other. This is the best-evidenced change in the project, and the board paid 5% of it (§2). The
+honest reading is in §4's last row.
+
+A negative result worth keeping alongside it: the same treatment applied to TWS-derived quantities
+(`d1`, `anom_persist` — which had no regional aggregate either, despite `anom_persist` being the
+highest-gain feature at 9.4%) is worth −0.0008, and a second and third radius add +0.0003. The rule
+that separates them is physical: **aggregate a noisy driver, not a smooth state.** Reanalysis errors
+average out between cells; the TWS field is already smooth, so a neighbourhood mean of `d1` is very
+nearly `d1`.
+
 ### 3.3 Model and post-processing
 
 Each model predicts the **residual** `TWS(t+1) − TWS(last observed)`. The ensemble weight is fitted
 rather than assumed: `stack.py` solves a non-negative least squares over every trained family
 (LightGBM at three capacities, XGBoost, CatBoost) on test-mix-weighted rows, renormalised to sum to
 one so that overall scale remains a separate decision, and shrunk halfway toward the incumbent
-blend. The chosen configuration is `DROPF=bigsa` — 261 features, the large-radius smoothed
-anchors dropped and the zonal features kept — trained with recency (`ramp`) sample weights and the
-test's own horizon mix, 16 seeds each of LightGBM and XGBoost at 410 and 230 rounds. Those round
+blend. The chosen configuration is `DROPF=bigsa,gdo` — **340 features**, the large-radius smoothed
+anchors and the GDO SPI block dropped, the zonal features kept — trained with recency (`ramp`) sample
+weights and the test's own horizon mix, 16 seeds each of LightGBM and XGBoost at 410 and 230 rounds,
+plus 16 seeds of a horizon-1 specialist spliced at β=0.50. Of those 340, **38 are NCEP-R2 anomalies,
+6 CPC anomalies, 24 released-SPEI anomalies and 11 regional means of the anomaly block** — the §3.2c
+work — and **none is `lat` or `lon`** (§5). The soil profile of §3.2b is *not* among them. Those round
 counts are `rounds.py`'s correction for FINAL training on 138 history months against layout A's 111,
 which is where its early-stopped count came from. The stack's own refit (lgb 0.39 / xgb 0.43 /
 lgbm 0.19) was **rejected**: leave-one-layout-out gave +0.00005, +0.00084 and −0.00028, so the
@@ -191,6 +269,13 @@ because each one stopped effort being spent in the wrong place.
 | hindcast bias correction | `Test.csv` contains only the 18 block months | the row a hindcast needs does not exist |
 | dropping the features that are dead at h=1 (31 all-null, 33 identically zero — 64 of 266) | six matched control/treatment pairs, two seeds on each layout (`DEADF=1`) | **rejected on accuracy, kept as an efficiency option.** Mean effect **+0.0000** with a spread of 0.0027, larger than the effect and than the seed-to-seed spread of the control. The premise is right and the conclusion does not follow: a 0.6 feature draw from 261 features with 65 dead yields ~118 live candidates, and from the 196 live features it also yields ~118 — a constant column is never a competitor for a split, only a name the sampler passes over. It does cut training time 25% |
 | the residual's anchor (predict `target − anom_persist` instead of `target − tws_known`) | three gap-free placements, both anchors trained on identical rows and scored on an identical mask (`fastval.py`) | **rejected.** Carrying the anchor's raw departure forward wins 0.0055 and 0.0052 on two placements and loses 0.0016 on the third, so the every-layout rule refuses it; the standardised form loses everywhere (+0.011 to +0.016), because it carries the ratio of two noisy per-cell sd estimates into every prediction. The pipeline already has `anom_persist` as its highest-gain feature at 9.4%, which is the likeliest reason moving it into the anchor buys little |
+| per-cell reliability, carried across time | λ per cell fitted on two layouts, applied to the held-out third | **rejected.** +0.0142 / +0.0205 / +0.0105 unshrunk, and still mixed when shrunk almost entirely onto the global constant. The per-cell shrinkage *oracle* is −0.039 to −0.049, twenty times anything else measured here, but it is a property of the window and not of the cell |
+| ensemble disagreement as a reliability signal | corr(\|lgb−xgb\|, \|error\|) and λ fitted per disagreement bin | **rejected.** The correlation is +0.076 / +0.083 / +0.116 and the fitted λ is flat across ten bins (1.08→1.02). The spread–skill relationship standard in ensemble forecasting is essentially absent here |
+| analogue / regime training weights | rows weighted toward the target window's ENSO state, paired arms | **rejected.** +0.0036 and +0.0012. Distinct from session 3's ONI-as-a-feature failure — the model never sees the index — but ~160 months is too few to spend on similarity |
+| variance-weighted training loss | rows weighted by their cell's TWS variability | **rejected.** +0.0009 / −0.0023 / −0.0004, mixed in sign. Also formally a mismatch: pooled RMSE's own objective is uniform weights |
+| a spatiotemporal U-Net on the global field | 12 epochs, same matrices | **rejected.** Plateaus at 0.675 plain against the tree's 0.621, and is data-starved by construction: one sample per (time, t_known) pair is **191 training images** where the tree sees 2.97M rows |
+| EOF truncation of the predicted field | basis fitted with the validation window excluded | **rejected.** Worse at every k and improving monotonically toward no projection (k=36 costs +0.059). The field needs 36 modes for 90% of its variance, but our error lies *inside* that subspace, not outside it |
+| any further signal in the current features | a second-stage model on the residual, held out across layouts | **rejected, and it closes the feature set.** +0.0179 / −0.0071 / +0.0063. A second stage finds era-specific structure, not transferable signal |
 | groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | no gain: the per-cell per-calendar-month climatology already carries the cell's slow state. Indicative rather than settled — see the note below on the placements these used |
 | directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | no gain: the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors. Same caveat as the row above |
 | free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
@@ -223,6 +308,31 @@ can (starts 12–77, 2003-08…2009-01), exactly as `validation_c.py` does for l
 identical bug, and whose repair changed which configuration the pipeline chose. The two rejected
 feature families above were measured on the old placements; they are recorded as unpromising rather
 than as settled, and the recursion row rests on `recursive.py`'s full-pipeline measurement alone.
+
+### The disagreement this report cannot close
+
+The change in §3.2c wins on five independent validation windows and the board paid 5% of it. Five
+mechanisms for that were tested and each was rejected by measurement, so it is recorded as an open
+question rather than explained away:
+
+- **selection over many trials** — refuted. D and E were built after the decision, D shares no block
+  month with any other layout, and both confirm at −0.0068 and −0.0130.
+- **noisier targets late in the record** — refuted. Roughness of the true field is 0.059–0.098
+  across the whole record with no trend. An apparent spike to 0.289 in 2017 was an artefact: those
+  months carry 4 to 51 unmasked cells, where a neighbourhood mean means nothing.
+- **the gains being specific to calm regimes** — refuted, and backwards. Splitting each layout at the
+  median spread of the actual change, the gain is **−0.0082 in the variable half and +0.0014 in the
+  calm half**, and the test era is the most variable stretch in the record.
+- **a more variable test era needing rescaled predictions** — refuted. The per-cell sd ratio between
+  the test anchors and training is 0.826, and the optimal global rescale implied by the board's own
+  numbers is 1.07, worth 0.001.
+- **the target standardisation leaking test-period information** — refuted by control. The per-cell
+  training mean correlates −0.463 with the mean over the test anchors, which looks like a demeaning
+  window spanning both; but the same statistic computed *inside* the training record is −0.326.
+
+What remains is a genuine gap between what five validation windows spanning 2005–2015 predict and
+what the 2015–2019 test pays. A reader should weigh every validation number in this report against
+that fact.
 
 Together these say something specific about the remaining error: it is **large-scale, spatially
 coherent, and temporally white**. Smoothing can only shave it — which is exactly what the
@@ -278,13 +388,28 @@ smoothed anchors rank above the cell's own recent TWS. And a cell's departure fr
 is largely observation noise — GRACE's effective resolution is coarser than the 1° grid — which is
 why smoothing the predicted residual field helps at all, and why it can only help a little: the
 residual correlation with the neighbouring cell is 0.967, so a neighbour's error is very nearly the
-same error. The chosen configuration's own gain ranking on layout A says both things
-outright — anomaly persistence 9.4%, the six-month SPEI change over the unobserved window 7.8%, the
-**ERA5 precipitation anomaly** `an_e5Pz_w3` 5.6%, the 24-month deviation 5.6%, the anchor's own
-anomaly 5.1%, and the raw last observation `tws_known` only 4.0%, behind four regional-drought
-terms. This is a gain ranking from the models that made the submission rather than a SHAP run on a
-separate fit, which is the stronger evidence for the claim being made: it is what the submitted
-models used.
+same error. The submitted configuration's own gain ranking says both things outright, and says
+something more:
+
+| rank | feature | gain | what it is |
+|---|---|---|---|
+| 1 | `anom_persist` | 10.1% | the anchor carried forward on its own climatology |
+| 2 | **`aw_an_e5Pz_acc`** | **7.1%** | **regional mean of the ERA5 precipitation anomaly** |
+| 3 | `dev24` | 6.2% | departure from a 24-month mean |
+| 4 | `anom_known` | 6.0% | the anchor's own anomaly |
+| 5 | **`aw_an_e5PERz_w6`** | **4.2%** | **regional mean of the 6-month water balance** |
+| 6 | **`aw_an_e5PERz_w3`** | **4.0%** | **regional 3-month water balance** |
+| 7 | **`aw_an_e5MTWSz_d`** | **3.7%** | **regional modelled-storage change** |
+| 8 | `w4_SPEI_06_t_d` | 3.7% | the six-month SPEI change over the unobserved window |
+| 10 | `tws_known` | 2.7% | the raw last observation |
+
+**Four of the top seven features are the regional anomaly means added in §3.2c**, and the raw last
+observation ranks tenth behind four regional drought terms. That is independent corroboration of the
+argument in §3.2c: the model was starved of the forcing at the scale where reanalysis is reliable,
+and given it, it uses it heavily. Two further readings follow. Regional drought signals outrank a
+cell's own history. And a cell's departure from its neighbourhood is largely observation noise —
+blurring the true target over its eight neighbours costs only 0.0619 — which is why smoothing the
+predicted residual helps at all, and why it can only help a little.
 
 ### 6.3 Approach reusability
 The pipeline is variable-agnostic: any gridded monthly target with gaps, plus any covariate set. The
@@ -301,13 +426,12 @@ persistence.
 Emissions are measured **during** the runs that produce the submitted models, not reconstructed
 afterwards: `run_models.py` starts a CodeCarbon tracker around each training run and writes one row
 per run, and `carbon_report.py` totals them and splits validation from final training
-(`out/carbon/summary.md`). Totals: **0.2374 kg CO₂e** over **216 measured training runs**, 12.11
-hours of training and 0.5135 kWh — 207 FINAL runs (11.75 h, 0.2302 kg) and 9 validation runs
-(0.37 h, 0.0072 kg), a mean of 1.10 g CO₂e per run. For scale, that is roughly a kilometre and a
-half of driving. The phase split had its own version of the layout-name bug: it matched the literal
-`FINAL`, so the 32 runs that trained the submitted models were counted as validation and the cost of
-the thing being shipped was understated. Runs skipped
-because a checkpoint already existed are not counted, so this is the cost of work actually done. The instrumentation cannot break a training run —
+(`out/carbon/summary.md`). Totals: **0.4214 kg CO₂e** over **282 measured training runs**,
+21.44 hours of training and 0.9154 kWh — 273 FINAL runs (21.08 h, 0.4142 kg) and 9 validation runs
+(0.37 h, 0.0072 kg). For scale, that is roughly three kilometres of driving. The phase split had its
+own version of the layout-name bug: it matched the literal `FINAL`, so runs on the `FINALe` and
+`FINALvn2` matrices — which trained the submitted models — were counted as validation and the cost
+of the shipped artefact was understated. The instrumentation cannot break a training run —
 a missing dependency or a platform that withholds power counters prints one line and continues.
 Efficiency: features are built once and cached as float32 and every model trains from that cache;
 trees use 63-bin histograms; the orchestrator checkpoints every step so an interrupted run resumes
@@ -318,7 +442,8 @@ instead of repeating work, which is itself the largest saving in the project.
 Python 3.10; polars, LightGBM, XGBoost, CatBoost, xarray, scipy, codecarbon.
 
 ```
-python validation.py ; python validation_b.py ; python validation_c.py   # the three layouts
+python validation.py ; python validation_b.py ; python validation_c.py   # layouts A, B, C
+python validation_extra.py D 2005-09-01 ; python validation_extra.py E 2007-09-01
 PER_ROW=2 python build_mats.py A|B|C|FINAL                                # cached feature matrices
 python add_anchor_feats.py A|B|C|FINAL                                    # smoothed-anchor features
 python run_models.py FINAL {lgb|lgbs|lgbm|xgb|cat} v5x_noll_sa [rounds]   # one seed
@@ -358,5 +483,11 @@ docstring.
 | layout-C repair (zonal features kept, h=1 specialist adopted) + corrected boosting rounds | **0.692657** |
 | 0.7/0.3 blend with a second capacity | 0.693283 |
 | 0.5/0.5 blend with a second capacity | 0.693725 |
-| **best scored** (`out/sub_q_main.csv`) | **0.692657** |
-| ERA5 soil profile (`out/sub_r_prof.csv`, §3.2b) | *submitted next* — validation says −0.0036, ≈ −0.0017 on the board |
+| ERA5 soil profile (§3.2b) | 0.695366 — **refuted**, and the reason is §2's transfer table |
+| smoothing 0.7/it1 → 0.5/it2 | 0.692773 — refuted |
+| **NCEP-R2 + CPC encoding, and the covariate anomalies at regional scale (§3.2c)** | **0.692189** |
+
+The submitted file is `out/sub_v_anwide.csv`. Two of the five entries above are refutations of
+changes this project's own validation had adopted, and they are listed because they are the evidence
+behind §2's central finding: on this problem a validation gain below roughly 0.003 does not predict
+the sign of the leaderboard gain.
