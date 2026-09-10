@@ -2584,3 +2584,47 @@ That is the honest next step, and it is a methodological one rather than a model
 constraint on this project is no longer ideas, it is the ability to tell a real idea from a lucky
 one. Sampling more ideas against the current gate makes the submission worse in expectation, not
 better.
+
+# Session 10t — five layouts, and the disagreement is real
+
+## The gate was not the problem
+Session 10s argued the adoptions might be selection noise, because layouts B and C share six block
+months and both sit in 2009-2012. Two new layouts were built to settle it -- `validation_extra.py`
+places the test's own [1,3,4,7,1,2] geometry at a chosen anchor rather than at the latest one:
+
+    layout D  2005-09 .. 2008-12   35 months of history   0 block months shared with A, B or C
+    layout E  2007-09 .. 2010-12   59 months of history   1 with B, 4 with C, 2 with D
+
+Both reproduce the test horizon mix to three decimals. Re-gating the two adopted representation
+fixes on layouts no decision has ever seen:
+
+    layout   before both fixes   shipped     delta
+    D                   0.5032    0.4964   -0.0068
+    E                   0.4902    0.4772   -0.0130
+
+Against -0.0091 on A/B/C. **Five layouts now agree.** The fixes are real and the selection-bias
+hypothesis is refuted -- which is worth stating plainly, because it was my hypothesis and the
+measurement killed it.
+
+## And the era hypothesis is refuted too
+The gains do order themselves by window date -- E (2009) -0.0130, C (2010) -0.0096, B (2011)
+-0.0072, A (2014) -0.0040, board (2017) -0.0005 -- which looked like a value that decays toward the
+present. Two mechanisms were tested and neither holds:
+
+  * **noisier targets later.** Roughness of the true field, RMS(cell - mean of its 8 neighbours),
+    is 0.059-0.098 across the whole record with no trend. An apparent spike to 0.289 in 2017 was an
+    artefact: those months have 4 to 51 unmasked cells, so a "neighbourhood mean" is meaningless.
+  * **the fixes only help in calm regimes.** The opposite is true. Splitting each layout's months at
+    the median spread of the actual change, the gain is **-0.0082 in the variable half and +0.0014
+    in the calm half** -- it is concentrated exactly where the test era sits.
+
+## Where that leaves it
+Every validation measure available says these features are real and should help most in precisely
+the regime the test occupies: five independent windows, two of them never used for any decision, and
+the gain concentrated in the variable half of each. The board paid -0.00047, against a prediction of
+about -0.0058.
+
+The observed board gap has a standard error of 0.00033 for this pair, so the honest reading is a
+true board gain somewhere in -0.0004 to +0.0013 -- which excludes the validation prediction. The
+disagreement is real, it is not selection, it is not target noise, and it is not the regime. I could
+not explain it, and saying so is more useful than a sixth hypothesis I cannot test.
