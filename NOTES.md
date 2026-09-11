@@ -2856,3 +2856,34 @@ measured on fastval.py placements that straddled GRACE gaps: groundwater memory 
 anomaly lags, 24-month trend) and directional spatial structure. fastval.py has since been repaired
 to refuse placements the record cannot carry gap-free. Re-measuring them is the only open item in
 the table, and both scored +0.0002 and +0.0005 on the bad placements, so the expectation is small.
+
+# Session 11f — the groundwater-memory "win" is an artefact of the harness, not a finding
+
+Re-measuring the two families REPORT §4 left "unpromising rather than settled", on the REPAIRED
+fastval placements (starts 20/40/60, all gap-free):
+
+    start          baseline   +mem      delta
+    20 (2004-04)    0.7063    0.6892   -0.0171
+    40 (2005-12)    0.6336    0.6331   -0.0005
+    60 (2007-08)    0.6005    0.5885   -0.0120
+    mean                               -0.0099
+
+Wins on all three, against +0.0002 on the old gap-straddling placements. I called that a signal.
+It is not, and the check that kills it took two minutes.
+
+`fastval`'s BASELINE feature list is h, month sin/cos, tws_k, anom_k, tws_k1, tws_k2, d1, d2,
+clim_n, climsd_n, clim_gap, clim_k, the five covariates at t with z-scores, differences and window
+means, and one neighbour mean. **Its deepest memory is d2 -- two months.** The `mem` arm adds the
+cell's anomaly at lag 12 and 24 and a 24-month trend, so it is giving a memoryless harness memory.
+
+The real pipeline already has all of it and more: `used_FINALvn2_*.json` lists lag1, lag2, lag3,
+lag6, lag12, dev24, trend24, d12, zd12, dzd12, sd24, tws_ly, anom_persist and trend_persist, plus
+w_/w4_ neighbourhood versions of dev24, trend24 and anom_known. There is nothing to add.
+
+So the -0.0099 measures the value of long memory in general, which the pipeline already captures,
+and the +0.0002 in the real harness is the correct number. REPORT §4's stated reason -- "the
+per-cell per-calendar-month climatology already carries the cell's slow state" -- survives.
+
+The lesson is the project's own rule in a new costume: a fast proxy harness answers "does X help a
+model like this one", not "does X help OUR model", and the two differ exactly when the proxy's
+baseline is missing the feature family under test. Check the incumbent's feature list first.
