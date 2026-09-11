@@ -2887,3 +2887,37 @@ per-cell per-calendar-month climatology already carries the cell's slow state" -
 The lesson is the project's own rule in a new costume: a fast proxy harness answers "does X help a
 model like this one", not "does X help OUR model", and the two differ exactly when the proxy's
 baseline is missing the feature family under test. Check the incumbent's feature list first.
+
+# Session 11g — directional spatial structure, measured properly at last, and rejected
+
+REPORT §4 carried this family at "+0.0005 and +0.0001 against base", from `fastval.py`'s boxmean
+on the old 40x40 domain. That code path indexes a grid-to-cell map holding -1 wherever the grid has
+no land cell: it throws on `np.unravel_index` and silently writes to the last cell on the way back
+out, so on the global grid the harness now uses it cannot run at all. The family had never been
+measured on this domain, and 0 of the 340 shipped features are direction-split while 39 are
+spatial and isotropic.
+
+`add_dir_feats.py` builds west/east/north/south neighbourhood means and their W-E and N-S
+differences for five keys (anom_known, dev24, an_e5PERz_acc, an_e5Pz_acc, an_SOIL_MOISTURE_tz_d),
+keyed on (time, t_known) exactly like add_wide4, as a side-car parquet so no matrix is rebuilt.
+`run_models.py` loads it behind DIRF=1, so the arms differ in nothing else.
+
+    layout    shipped     +dir      delta
+    Avn2       0.6343    0.6351    +0.0008
+    Bvn2       0.5259    0.5255    -0.0004
+    Cvn2       0.5183    0.5174    -0.0009
+    D          0.4964    0.4960    -0.0004
+    E          0.4772    0.4771    -0.0001
+    mean                           -0.0002      worst +0.0008, wins 4/5, clears 0.0003 on 3/5
+
+**REJECTED** by the every-layout rule. Provenance checked rather than assumed: `used_*.json` shows
+d0 with 340 features and 0 directional, d1 with 360 and 20, so the family really was in the
+treatment arm and this is a measurement rather than a no-op.
+
+The verdict REPORT §4 already stated survives, and now rests on evidence: the residual is spatially
+coherent but **isotropic**. Splitting the neighbourhood along the drainage direction buys nothing
+over the existing isotropic anchors. This was the last untested feature family.
+
+Note the two arms also disagree about WHERE: directional helps at short horizons on Cvn2 and hurts
+at h5-h7 on Avn2/Bvn2/D. That is the signature of a feature fitting a window rather than a physical
+asymmetry, which is the same failure mode as the per-cell reliability row.

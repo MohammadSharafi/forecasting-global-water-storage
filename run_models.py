@@ -109,6 +109,16 @@ def base_of(df):
     if AT=="decay":
         lam=RHO**df["horizon"].to_numpy().astype(np.float64); return lam*k+(1.0-lam)*c
     raise SystemExit(f"unknown ANCHOR_TARGET={AT}")
+# A matrix built before a feature family was added carries none of its columns, and the read
+# below then fails with a thousand-column polars dump that names the first missing one only.
+# Layouts A, B and C are 269-column builds from before the NCEP-R2/CPC/SPEI encoding while the
+# feature list is 340, which cost a whole experiment run to diagnose. Say so instead.
+_have=set(pl.scan_parquet(f"out/mats/{L}_tr.parquet").collect_schema().names())
+_miss=[f for f in F if f not in _have and f not in SA and f not in SA2 and f not in SA3 and f not in DIRC]
+if _miss:
+    raise SystemExit(f"{L}_tr.parquet is STALE for featset {FS}: {len(_miss)} of {len(F)} features "
+                     f"are absent ({_miss[:5]}...). It has {len(_have)} columns. Rebuild it with "
+                     f"`python build_mats.py {L}`, or use a layout built with the current feature set.")
 tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon","csd"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC])))
 if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))

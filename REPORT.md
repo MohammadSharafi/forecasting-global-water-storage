@@ -333,7 +333,7 @@ because each one stopped effort being spent in the wrong place.
 | EOF truncation of the predicted field | basis fitted with the validation window excluded | **rejected.** Worse at every k and improving monotonically toward no projection (k=36 costs +0.059). The field needs 36 modes for 90% of its variance, but our error lies *inside* that subspace, not outside it |
 | any further signal in the current features | a second-stage model on the residual, held out across layouts | **rejected, and it closes the feature set.** +0.0179 / −0.0071 / +0.0063. A second stage finds era-specific structure, not transferable signal |
 | groundwater memory (12/24-month anomaly lags, 24-month trend) | +0.0002 against base, three placements (`fastval.py`) | no gain: the per-cell per-calendar-month climatology already carries the cell's slow state. Indicative rather than settled — see the note below on the placements these used |
-| directional spatial structure (13x13 box split west/east, upstream covariate means) | +0.0005 and +0.0001 against base | no gain: the residual is spatially coherent but **isotropic** — splitting the neighbourhood along the drainage direction buys nothing over the existing great-circle anchors. Same caveat as the row above |
+| directional spatial structure (west/east/north/south neighbourhood means and their differences, `add_dir_feats.py`, loaded behind `DIRF=1` so the arms differ in nothing else) | five layouts, two seeds each, against the shipped configuration | **rejected.** Avn2 **+0.0008**, Bvn2 −0.0004, Cvn2 −0.0009, D −0.0004, E −0.0001 — mean −0.0002, winning on four of five and clearing 0.0003 on three, so the every-layout rule refuses it. Of the 340 shipped features 39 are spatial and **every one is isotropic**, so this was a genuine gap rather than a duplicate; the answer is that the residual is spatially coherent but isotropic, and splitting the neighbourhood along the drainage direction buys nothing. Provenance checked rather than assumed: `used_*.json` records 340 features and 0 directional in the control against 360 and 20 in the treatment. An earlier version of this row read +0.0005 from `fastval.py`, whose `boxmean` indexed a grid-to-cell map holding −1 where the grid has no land cell — it could not run on the global grid at all, so the family had never actually been measured |
 | free information in the unmasked test rows | the 6 unmasked months are exactly the 6 block anchors; the successor of every test month is masked | the organisers' masking is airtight — no test row's target is another row's given `TWS_t`. Nothing to take |
 
 One avenue was **re-opened** and then closed by checking the artefacts rather than the code.
@@ -361,9 +361,14 @@ harness scores persistence at 0.711 and climatology at 1.019, not the 1.166 and 
 recorded, and the record is 149 months from 2002-05 rather than the gap-free 161 those numbers
 imply. `fastval.py` now refuses a placement the record cannot carry gap-free and prints the ones it
 can (starts 12–77, 2003-08…2009-01), exactly as `validation_c.py` does for layout C — which had this
-identical bug, and whose repair changed which configuration the pipeline chose. The two rejected
-feature families above were measured on the old placements; they are recorded as unpromising rather
-than as settled, and the recursion row rests on `recursive.py`'s full-pipeline measurement alone.
+identical bug, and whose repair changed which configuration the pipeline chose. The groundwater-memory
+row above was measured on those old placements and stays indicative rather than settled — and
+`fastval.py` cannot settle it, because its own baseline has no memory deeper than two months where
+the pipeline carries `lag1`–`lag12`, `dev24`, `trend24`, `sd24`, `anom_persist` and `trend_persist`.
+Re-run on repaired gap-free placements its memory arm "wins" by 0.0099, which measures the value of
+long memory in general rather than anything this model lacks. The directional row no longer carries
+that caveat: it has now been measured in the real pipeline, on five layouts. The recursion row rests
+on `recursive.py`'s full-pipeline measurement alone.
 
 ### The disagreement this report cannot close
 
