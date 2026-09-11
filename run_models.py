@@ -67,12 +67,17 @@ if FS.endswith("_sa"): FS=FS[:-3]
 # switch rather than a featset suffix so the control and treatment arms differ in nothing else.
 DIRC=_acols(f"out/mats/{L}_tr_dir.parquet") if os.environ.get("DIRF")=="1" else []
 USE_DIR=bool(DIRC)
+# ARF=1 appends the per-cell per-horizon anchor rescaling built by add_ar_feats.py. ar_blend.py
+# measured that quantity as a post-hoc linear correction (-0.0048 on five layouts); this asks
+# whether the model does better holding it than having the correction applied after it.
+ARC=_acols(f"out/mats/{L}_tr_ar.parquet") if os.environ.get("ARF")=="1" else []
+USE_AR=bool(ARC)
 SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
       "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL_noll":[f for f in ALL if f not in ("lat","lon")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")],
       # ablation pair for the covariate-anomaly features: same set with and without them
       "v5x_noll_noanom":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("an_")],
       "allnoll_noanom":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("an_")]}
-F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])+(DIRC if USE_DIR else [])
+F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])+(DIRC if USE_DIR else [])+(ARC if USE_AR else [])
 # DROPF=anom,scale removes a feature group without needing a new featset name -- this is how the
 # session-9d experiments are ablated against the same baseline. (Not DROP: that is the MLP dropout.)
 DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
@@ -114,16 +119,17 @@ def base_of(df):
 # Layouts A, B and C are 269-column builds from before the NCEP-R2/CPC/SPEI encoding while the
 # feature list is 340, which cost a whole experiment run to diagnose. Say so instead.
 _have=set(pl.scan_parquet(f"out/mats/{L}_tr.parquet").collect_schema().names())
-_miss=[f for f in F if f not in _have and f not in SA and f not in SA2 and f not in SA3 and f not in DIRC]
+_miss=[f for f in F if f not in _have and f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC]
 if _miss:
     raise SystemExit(f"{L}_tr.parquet is STALE for featset {FS}: {len(_miss)} of {len(F)} features "
                      f"are absent ({_miss[:5]}...). It has {len(_have)} columns. Rebuild it with "
                      f"`python build_mats.py {L}`, or use a layout built with the current feature set.")
-tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon","csd"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC])))
+tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon","csd"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC])))
 if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
 if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
 if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
 if USE_DIR: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_dir.parquet"))
+if USE_AR: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_ar.parquet"))
 seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))
 # HFILT=1 or HFILT=2-7 trains a HORIZON SPECIALIST on that slice only (session 9m).
 # h=1 is 33% of the test and is a different problem from h=7: it is dominated by the cell's own
@@ -200,11 +206,12 @@ if os.environ.get("HMIX","")=="test":
     print(f"  HMIX=test: train horizon freq {[round(freq[k],3) for k in range(1,8)]}"
           f" -> weight range {hw.min():.2f}..{hw.max():.2f}",flush=True)
 del tr; gc.collect()
-va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if layout_base(L)!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC])))
+va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if layout_base(L)!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC])))
 if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
 if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
 if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
 if USE_DIR: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_dir.parquet"))
+if USE_AR: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_ar.parquet"))
 Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if layout_base(L)!="FINAL" else None
 # a specialist must be early-stopped on ITS OWN slice; predictions are still made for every row
 hv=va["horizon"].to_numpy(); VM=(hv>=HLO)&(hv<=HHI) if HFILT else None
