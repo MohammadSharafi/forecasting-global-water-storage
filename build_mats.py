@@ -27,7 +27,7 @@ from features_gdo import load_gdo
 # submission.
 # ...and a trailing "v<tag>" namespaces the files without changing what is built, so a feature
 # change that has to be measured against the cached matrices can build its own set beside them.
-_LNAME = re.compile(r"(FINAL|[ABC])(?:p(\d+))?(e)?(?:v[a-z0-9]+)?$")
+_LNAME = re.compile(r"(FINAL|[A-E])(?:p(\d+))?(e)?(?:v[a-z0-9]+)?$")
 
 
 def _parse(L):
@@ -87,7 +87,10 @@ def prepare(L, t0=None):
         rows_va = te.select(["ID", "lat", "lon", "time"]).join(known, on=["lat", "lon", "time"], how="left")
         meta_va = ["ID", "lat", "lon", "time", "t_known", "horizon", "tws_known"]
     else:
-        sfx = {"A": "", "B": "_B", "C": "_C"}[base_of(L)]; tp = pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist = pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
+        # layout A's files carry no suffix for historical reasons; every other layout is "_<name>".
+        # Derived rather than tabulated, so adding a layout does not mean editing three files.
+        _b = base_of(L); sfx = "" if _b == "A" else f"_{_b}"
+        tp = pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist = pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
         cov_all = tr.select(["lat", "lon", "time"]+COV)
         obs_hist = hist.select(["lat", "lon", "time", "TWS_t"])
         obs_all = pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat", "lon", "time", "TWS_t"])])

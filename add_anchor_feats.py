@@ -16,7 +16,8 @@ if base_of(L)=="FINAL":
     obs_hist=tr.select(["lat","lon","time","TWS_t"])
     obs_eval=pl.concat([obs_hist, te.filter(~pl.col("TWS_t_masked")).select(["lat","lon","time","TWS_t"])])
 else:
-    sfx={"A":"","B":"_B","C":"_C"}[base_of(L)]; tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
+    _b=base_of(L); sfx="" if _b=="A" else f"_{_b}"
+    tp=pl.read_parquet(f"out/pseudo_test{sfx}.parquet"); hist=pl.read_parquet(f"out/pseudo_hist{sfx}.parquet")
     obs_hist=hist.select(["lat","lon","time","TWS_t"])
     obs_eval=pl.concat([obs_hist, tp.filter(~pl.col("masked")).select(["lat","lon","time","TWS_t"])])
 for part,obs in (("tr",obs_hist),("va",obs_eval)):

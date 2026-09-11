@@ -75,6 +75,7 @@ DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
 if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
 if "scale" in DROPF: F=[f for f in F if f not in SCALE]
 if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "gdospi" in DROPF:   F=[f for f in F if not (f.startswith("an_spi") and "z_" in f)]
 if "anwide" in DROPF:    F=[f for f in F if not f.startswith("aw_")]
 # one switch per radius, so "does a second scale help" is measurable on a single matrix
 for _r in ("2","4","8","16"):

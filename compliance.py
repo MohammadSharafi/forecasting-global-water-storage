@@ -116,8 +116,7 @@ def main():
         # recompute the target-month climatology from Train.csv ALONE. If the matrix column
         # matches, no test-era observation entered it.
         hist = tr if LB == "FINAL" else pl.read_parquet(
-            {"A": "out/pseudo_hist.parquet", "B": "out/pseudo_hist_B.parquet",
-             "C": "out/pseudo_hist_C.parquet"}[LB])
+            "out/pseudo_hist.parquet" if LB == "A" else f"out/pseudo_hist_{LB}.parquet")
         cl = (hist.with_columns(pl.col("time").dt.month().alias("m"))
                   .group_by(["lat", "lon", "m"]).agg(pl.col("TWS_t").mean().alias("ref")))
         s = (va.with_columns(((pl.col("time").dt.month() % 12) + 1).alias("m"))

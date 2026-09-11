@@ -31,8 +31,15 @@ import os
 c = pl.scan_parquet(f"out/mats/{os.environ['FLCHK']}_va.parquet").collect_schema().names()
 prof = [x for x in c if x.startswith(("e5SW1","e5SW2","e5SW3","e5SW4","an_e5SW1","an_e5SW2","an_e5SW3","an_e5SW4"))]
 gdo  = [x for x in c if x.startswith(("an_spi24","an_spi48"))]
-print(f"  FINALe: {len(c)} columns, {len(prof)} soil-profile, {len(gdo)} GDO")
-assert prof and gdo, "the new feature families are missing from FINALe"
+r2   = [x for x in c if x.startswith("an_r2")]
+cpc  = [x for x in c if x.startswith("an_cpc")]
+spei = [x for x in c if x.startswith("an_SPEI")]
+L = os.environ["FLCHK"]
+print(f"  {L}: {len(c)} columns | soil-profile {len(prof)} | GDO {len(gdo)}"
+      f" | NCEP-R2 anom {len(r2)} | CPC anom {len(cpc)} | SPEI anom {len(spei)}")
+# assert what THIS layout is supposed to carry, not what a different one carried
+need = (prof and gdo) if L.endswith("e") else (r2 and cpc and spei)
+assert need, f"{L} is missing the feature families it was built for"
 PY
 [ $? -eq 0 ] || exit 1
 
