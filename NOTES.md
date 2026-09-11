@@ -2699,3 +2699,22 @@ Per-cell calendar-exact persistence on Train.csv, and the best single global shr
 
 Under the test's horizon mix that AR benchmark is 0.6352 on train-era data. Our board score is
 0.692. The gap is not explained by the feature set.
+
+## What the ledger is actually short of (and what a probe submission is worth)
+Adding members to the blend ledger one at a time, measured on the hidden 70% of a layout:
+
+    ledger                    A private gain    B private gain
+    11 GBM vectors only          -0.0047          -0.0112
+    + persistence                -0.0048          -0.0128
+    + pure climatology           -0.0076          -0.0232
+    + per-cell AR                -0.0125          -0.0253
+
+Four GBMs plus persistence and climatology beat SIXTY-TWO GBMs alone (-0.0073 vs -0.0070 on A).
+Capacity is not the constraint; structural difference is. Both probes score badly on their own --
+AR is 0.6942/0.6220 against the GBM's 0.6423/0.5403, climatology is worse than persistence -- and
+that is the point: they are the only vectors in the set that are not near-copies.
+
+A submission that scores worse cannot lower the displayed best, so a probe costs a daily slot and
+nothing else. out/probe_ar.csv and out/probe_clim.csv are built by ar_model.py; the AR fit for the
+test uses Train.csv alone (ends 2015-08, before every test month) and its pooled slopes reproduce
+the independent train-era measurement exactly (h1 0.800 ... h7 0.556).
