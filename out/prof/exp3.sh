@@ -1,6 +1,7 @@
 #!/bin/sh
 # Screen: regional means of the covariate-anomaly block. One layout first.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 export PER_ROW=2
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in ${LAYOUTS:-Bvn2}; do

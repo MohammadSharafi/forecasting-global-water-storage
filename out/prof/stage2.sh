@@ -3,6 +3,7 @@
 # beta=0.50 was adopted on the old one, and an adopted stage should not be carried across a
 # feature change without being re-measured.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 FD='bigsa,gdo'      # what the ablation adopted: soil profile in, GDO not on top of it
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 

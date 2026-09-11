@@ -1,6 +1,7 @@
 #!/bin/sh
 # Does offering the anomaly block at several spatial scales beat the single r=4?
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 export PER_ROW=2 ANWIDE_R=2,4,8
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in Avn3 Bvn3 Cvn3; do

@@ -489,7 +489,16 @@ afterwards: `run_models.py` starts a CodeCarbon tracker around each training run
 per run, and `carbon_report.py` totals them and splits validation from final training
 (`out/carbon/summary.md`). Totals: **0.4214 kg CO₂e** over **282 measured training runs**,
 21.44 hours of training and 0.9154 kWh — 273 FINAL runs (21.08 h, 0.4142 kg) and 9 validation runs
-(0.37 h, 0.0072 kg). For scale, that is roughly three kilometres of driving. The phase split had its
+(0.37 h, 0.0072 kg). For scale, that is roughly three kilometres of driving.
+
+One session is missing from that measurement, and is reported rather than quietly dropped. The
+directional-structure experiment in §4 ran through a script that did not set `CARBON=1`, so its
+three matrix builds, twenty training runs and five scorings — 1.28 hours of wall clock — produced
+no CodeCarbon rows at all. At the measured rate of 0.01965 kg CO₂e and 0.0427 kWh per training
+hour, that is an **estimated 0.025 kg CO₂e and 0.055 kWh**, giving an estimated project total of
+**≈0.447 kg**. It is labelled an estimate because it is one, and because the alternative —
+re-running the experiment under instrumentation — would emit the quantity being reported a second
+time. Every script in `out/prof/` now exports `CARBON=1`, so the gap cannot recur. The phase split had its
 own version of the layout-name bug: it matched the literal `FINAL`, so runs on the `FINALe` and
 `FINALvn2` matrices — which trained the submitted models — were counted as validation and the cost
 of the shipped artefact was understated. The instrumentation cannot break a training run —
@@ -503,13 +512,22 @@ instead of repeating work, which is itself the largest saving in the project.
 Python 3.10; polars, LightGBM, XGBoost, CatBoost, xarray, scipy, codecarbon.
 
 ```
-python validation.py ; python validation_b.py ; python validation_c.py   # layouts A, B, C
+python validation.py ; python validation_b.py ; python validation_c.py   # pseudo-test layouts A, B, C
 python validation_extra.py D 2005-09-01 ; python validation_extra.py E 2007-09-01
-PER_ROW=2 python build_mats.py A|B|C|FINAL                                # cached feature matrices
-python add_anchor_feats.py A|B|C|FINAL                                    # smoothed-anchor features
-python run_models.py FINAL {lgb|lgbs|lgbm|xgb|cat} v5x_noll_sa [rounds]   # one seed
-python final_assemble.py <name> <stem:weight> ...                         # the submitted CSV
+PER_ROW=2 python build_mats.py Avn2|Bvn2|Cvn2|D|E|FINALvn2                # cached feature matrices
+python add_anchor_feats.py Avn2|Bvn2|Cvn2|D|E|FINALvn2                    # smoothed-anchor features
+python run_models.py FINALvn2 {lgb|lgbs|lgbm|xgb|cat} v5x_noll_sa [rounds] # one seed
+python final_assemble.py <name> <stem:weight> ...                         # the single-model CSV
+python lb_blend.py fit 2.0                                                # the §3.4 blend, submitted
+python lb_blend.py simulate A                                             # its public->private test
 ```
+
+**Use those layout names, not the bare `A`, `B`, `C`.** Those three are 269-column matrices built
+before the NCEP-R2/CPC/SPEI encoding of §3.2c and are kept only for provenance; the shipped feature
+set is 340 and the five layouts that carry it are `Avn2`, `Bvn2`, `Cvn2`, `D` and `E`. Running the
+current configuration against a stale matrix used to fail inside polars with a thousand-column
+dump — `run_models.py` now checks the schema first and names the layout, how many features are
+missing and the rebuild command.
 
 A layout may carry its variant in its **name**, so an experiment that changes every matrix builds
 beside the cached ones instead of over them: `Ap3` is layout A at `PER_ROW=3`, `Ae` and `FINALe` are
@@ -523,6 +541,9 @@ PROF=1 PER_ROW=2 python build_mats.py FINALe      # the §3.2b feature set
 DROPF=e5prof python run_models.py ...             # ablate the soil profile alone
 DROPF=gdo    python run_models.py ...             # ablate the GDO block alone
 FLAYOUT=FINALe python final_assemble.py ...       # assemble from the profile matrix
+python add_dir_feats.py Avn2                      # the §4 directional family (rejected)
+DIRF=1 python run_models.py Avn2 lgb v5x_noll_sa  # its treatment arm; DIRF=0 is the control
+sh out/prof/dirtest.sh                            # both arms, five layouts, scored
 ```
 
 `./run_night.sh` runs all of it end to end, resumably, and writes `out/RUN_REPORT.md` containing the

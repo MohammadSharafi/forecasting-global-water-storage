@@ -4,6 +4,7 @@
 #     trend_persist, anom_persist), aimed at h=1 where a third of the test weight is
 #   - three radii instead of one
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 export PER_ROW=2 ANWIDE_R=2,4,8
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in Bvn4 Cvn4 Avn4; do

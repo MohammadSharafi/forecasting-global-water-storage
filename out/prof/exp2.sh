@@ -3,6 +3,7 @@
 # If the idea is worth >0.003 it should be visible at SUB=0.4; if it is invisible here it is
 # not worth an hour of full training.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in Avn Bvn Cvn; do
   for arm in "a0:ramp" "a1:ramp,analog"; do

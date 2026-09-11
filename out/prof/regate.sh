@@ -2,6 +2,7 @@
 # Re-gate the two adopted representation fixes on layouts the decision never saw.
 #   g0 = the feature set BEFORE both fixes      g1 = the shipped configuration
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 export PER_ROW=2
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in D E; do

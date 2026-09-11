@@ -8,6 +8,7 @@
 #   x2 gdo    + GDO SPI only                DROPF=bigsa,e5prof
 # Two seeds each; eval_mix averages seeds for a stem, which is how the pipeline scores anyway.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 FW=ramp; FH=test; FM=lgb
 for arm in "x0:bigsa,e5prof,gdo" "x3:bigsa" "x1:bigsa,gdo" "x2:bigsa,e5prof"; do
   tag=${arm%%:*}; d=${arm#*:}

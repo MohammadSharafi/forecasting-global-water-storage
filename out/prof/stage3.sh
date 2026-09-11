@@ -4,6 +4,7 @@
 #    blend is half XGBoost, so the family it was never measured on carries half the weight
 # 3. early-stopped round counts for both families on the new feature set
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 # build_mats defaults PER_ROW to 3; the value gated by perrow_scan.py and used by every
 # matrix the pipeline ships is 2. Set it explicitly -- an unset PER_ROW here silently
 # builds a third more training rows than the configuration being shipped, and on this

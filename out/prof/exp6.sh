@@ -1,6 +1,7 @@
 #!/bin/sh
 # Variance-weighted training: spend capacity where the metric's error actually is.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in Bvn2 Cvn2 Avn2; do
   for arm in "v0:ramp" "v1:ramp,var"; do

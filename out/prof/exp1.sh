@@ -2,6 +2,7 @@
 # Experiment 1: anomaly-encode the three blocks that never received it.
 # One matrix per layout, four arms on it, so the only difference between arms is the feature set.
 cd "$(cd "$(dirname "$0")/../.." && pwd)"; PY=./.venv/bin/python
+export CARBON=1   # or the runs are invisible to carbon_report.py
 export PER_ROW=2
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
 for X in Avn Bvn Cvn; do
