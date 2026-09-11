@@ -17,3 +17,4 @@ Copied 2026-09-09 before rebuilding with the ERA5 soil profile and GDO SPI.
 | sub_x_lb2.csv | **0.683712087** | L1<=2 blend over the 16-file ledger (lb_blend.py). Predicted 0.683244; the 0.00047 miss is the D^2(all rows) vs D^2(public 30%) proxy error |
 | sub_y_lb.csv | **0.681717090** | L1<=4 refit. Predicted 0.676475 -- the oracle over-shot by 0.0052, transfer only 28% |
 | probe_clim.csv | 1.279955747 | pure climatology probe; a dimension, not a model |
+| sub_z_lb.csv | **0.681692450** | L1<=2 refit over 19 files. Predicted 0.677391; transfer 0.6% -- the oracle is exhausted |

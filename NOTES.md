@@ -2789,3 +2789,34 @@ benchmark on the BOARD would be about 0.8154. Relative to the board's own persis
 
 We are well clear of any AR benchmark. The 0.63 goal is 0.711 of persistence and needs a further
 7.6% relative reduction on top of everything above.
+
+# Session 11d — blending is exhausted; stop spending submissions on it
+
+    sub_z_lb   0.681692450   against 0.681717090   -0.000025   (predicted 0.677391)
+
+Three points on the oracle:
+
+    file        ||w||1  members  predicted   actual      transfer
+    sub_x_lb2     2.0     16     0.683244    0.683712      94.8%
+    sub_y_lb      4.0     17     0.676475    0.681717      27.6%
+    sub_z_lb      2.0     19     0.677391    0.681692       0.6%
+
+At the SAME budget the miss grew 9x as the ledger went 16 -> 19, because the three files I added
+were blends that already live in the span. They gave the optimiser degenerate directions to
+exploit without giving it any new information, and it took them.
+
+Can the proxy be repaired? Each scored blend pins w'D2_pub w exactly, so if D2_pub = alpha*D2_all
+for one scalar alpha it is fixable. The three imply alpha = 1.0444, 1.2652, 1.0549 -- the two
+low-norm fits agree, the high-norm one does not. No single scalar repairs it, and the deviation
+grows with exactly the freedom the optimiser is given. That is the signature of proxy overfitting,
+not of a correctable bias.
+
+A refit over the BASE ledger only (17 files, no blend-of-blends) predicts 0.677764 at L1<=2. At the
+94.8% transfer the first fit achieved that would be 0.678485; at 50% it is 0.684977, i.e. WORSE
+than what we already hold. Given the last two transfers were 27.6% and 0.6%, assuming 95% is not
+defensible. The expected value is around zero and the variance is real.
+
+Decision: no further blend submissions. Banked total 0.692189 -> 0.681692, -0.010497.
+
+probe_ar and probe_mlp remain unsubmitted. Their only purpose was to widen the ledger, and the
+ledger is no longer the binding constraint, so they are not worth a slot either.
