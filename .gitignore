@@ -8,3 +8,4 @@ __pycache__/
 external/
 .DS_Store
 catboost_info/
+.unlazy-hook-state.json
