@@ -2820,3 +2820,39 @@ Decision: no further blend submissions. Banked total 0.692189 -> 0.681692, -0.01
 
 probe_ar and probe_mlp remain unsubmitted. Their only purpose was to widen the ledger, and the
 ledger is no longer the binding constraint, so they are not worth a slot either.
+
+# Session 11e — hunting 0.63: the arithmetic says it is not there
+
+## EOF/mode forecasting, closed by a second, independent measurement
+REPORT §4 already closed EOF truncation of the PREDICTION ("our error lies inside that subspace").
+Today's measurement is the complementary one -- project the ERROR onto the field's EOFs:
+
+    k modes     captures of TWS field    captures of our error    oracle RMSE (A / B)
+      20            81.9%                     21.8%                0.5579 / 0.4618
+      50            94.5%                     40.3%                0.4813 / 0.4101
+
+Twenty global modes carry 82% of the field and only 22% of our residual. The model already has the
+large scales; the residual is high-rank. A mode-forecasting model would be built for a prize that
+is not there. Two independent measurements, same verdict.
+
+## Why 0.63 is not reachable, in one line of arithmetic
+The prohibited routes were all measured, for scale, in earlier sessions:
+
+    interpolation between observed test blocks    0.634 on layout A -- WORSE than our legit 0.636
+    covariates at t+1 (proper GBM, 3 layouts)     mean -0.00184, worse on two of three
+    a model given the next observed block's TWS   gains 0.006
+
+So the best prohibited lever available inside the provided files is worth about **0.006**. From
+0.681692 that reaches 0.6757. The goal of 0.63 is 0.0517 away. **It cannot be reached even by
+breaking the rule with the data we were given**, which is why session 3's conclusion still stands:
+the entries below 0.63 most plausibly use an external gap-free TWS product.
+
+Note session 3's "next-month covariates give ~0.025" was a linear fit dominated by layout B and was
+superseded by session 10q's proper measurement (-0.00184). The ~0.025 figure should not be quoted.
+
+## What is actually left
+REPORT §4 records two feature families as "unpromising rather than settled" because they were
+measured on fastval.py placements that straddled GRACE gaps: groundwater memory (12/24-month
+anomaly lags, 24-month trend) and directional spatial structure. fastval.py has since been repaired
+to refuse placements the record cannot carry gap-free. Re-measuring them is the only open item in
+the table, and both scored +0.0002 and +0.0005 on the bad placements, so the expectation is small.
