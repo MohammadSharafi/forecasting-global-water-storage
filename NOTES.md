@@ -2750,3 +2750,42 @@ the L1<=4 fit. The calibration is an extrapolation from ONE point and is the wea
 Probes built for the next round: probe_clim (pure climatology), probe_ar (per-cell AR, ar_model.py)
 and probe_mlp (6 seeds of the FINAL-era MLP). All three are poor models; all three are directions
 the ledger does not have.
+
+# Session 11c — the oracle overfits its own proxy, and the budget must come down
+
+    sub_y_lb     0.681717090   against 0.683712087   -0.001995   NEW BEST (predicted 0.676475)
+    probe_clim   1.279955747   a dimension, not a model
+
+Two points now measure the method's error:
+
+    ||w||_1    predicted    actual      MSE miss    realised/predicted gain
+      2.0      0.683244     0.683712    +0.000640         95%
+      4.0      0.676475     0.681717    +0.007120         28%
+
+The miss grew 11x for a 2x weight norm, so it scales as ||w||^3.5, not the ||w||^2 I assumed.
+Worse, BOTH misses are positive. Sampling noise would change sign. A systematic positive bias is
+the optimiser selecting directions where D2_all happens to overstate D2_pub -- it is overfitting
+the proxy, and the freedom to do that grows with the budget. My ||w||^2 calibration was wrong and
+it cost most of the second submission's expected gain.
+
+Mitigation: keep ||w||_1 <= 2, and keep every scored blend IN the ledger. Their true scores pull
+back exactly the directions the optimiser previously over-trusted -- the L1<=2 refit now puts 0.847
+on sub_x_lb2 rather than re-extrapolating.
+
+Blending to date: 0.692189 -> 0.683712 -> 0.681717, total -0.010472, and clearly decelerating
+(-0.0085, then -0.0020).
+
+## A comparison I made badly, corrected
+I quoted the train-era AR benchmark (0.6352 under the test horizon mix) as though it sat on the
+same scale as a board score. It does not. probe_persistence scored 0.8864 on the board against a
+train-era persistence of 0.6905 under the same mix, so the test era is 1.28x harder. The AR
+benchmark on the BOARD would be about 0.8154. Relative to the board's own persistence baseline:
+
+    persistence     0.8864   1.000
+    AR (implied)    0.8154   0.920
+    our best        0.6817   0.769
+    leader cluster  0.6230   0.703
+    top entry       0.5600   0.632
+
+We are well clear of any AR benchmark. The 0.63 goal is 0.711 of persistence and needs a further
+7.6% relative reduction on top of everything above.
