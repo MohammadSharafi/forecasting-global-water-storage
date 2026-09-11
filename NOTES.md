@@ -2976,3 +2976,27 @@ out/sub_ac_armarg.csv = sub_z_lb + corr. Honest expectation: validation says -0.
 transfer ratio has been 0.77-0.83 for real structural changes and 5% for the one representation fix
 the board refused, so the board is worth somewhere between -0.0002 and -0.0040. That is a record if
 it transfers and nothing if it does not. It is NOT a route to 0.65.
+
+## Sensitivity guard on the anchor rescaling — it is not fragile
+The -0.0048 was fitted at one AR shrinkage (K=100) and one weight budget, so both were varied.
+Marginal value of AR on a persistence/climatology-corrected base, leave-one-layout-out:
+
+        K  budget      mean     worst   wins   per-layout (Avn2 Bvn2 Cvn2 D E)
+       20     1.5   -0.0036   -0.0014   5/5   -0.0062 -0.0014 -0.0020 -0.0037 -0.0049
+       20     2.0   -0.0037   -0.0013   5/5   -0.0072 -0.0013 -0.0029 -0.0022 -0.0050
+       20     3.0   -0.0037   -0.0013   5/5   -0.0072 -0.0013 -0.0029 -0.0022 -0.0050
+      100     1.5   -0.0038   -0.0017   5/5   -0.0060 -0.0019 -0.0017 -0.0045 -0.0051
+      100     2.0   -0.0048   -0.0024   5/5   -0.0086 -0.0024 -0.0038 -0.0029 -0.0061   <- shipped
+      100     3.0   -0.0047   -0.0024   5/5   -0.0086 -0.0024 -0.0038 -0.0026 -0.0061
+      500     1.5   -0.0037   -0.0016   5/5   -0.0054 -0.0020 -0.0016 -0.0045 -0.0049
+      500     2.0   -0.0050   -0.0030   5/5   -0.0084 -0.0032 -0.0041 -0.0030 -0.0061
+      500     3.0   -0.0047   -0.0017   5/5   -0.0084 -0.0031 -0.0041 -0.0017 -0.0060
+
+Nine settings, 5/5 on every one, and the worst single layout is negative in all of them. Compare
+the per-cell reliability row in REPORT §4, which flipped sign between layouts the moment it was
+shrunk differently -- that is what a fragile result looks like, and this is not it.
+
+K=500 scores -0.0050 against the shipped K=100's -0.0048 while its worst layout is -0.0030 against
+-0.0024. The difference is 0.0002, far inside the noise this project has repeatedly been burned by,
+so the shipped configuration stays at K=100. Choosing K on a 0.0002 validation difference is the
+same mistake as the L1=4 blend.
