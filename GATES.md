@@ -30,3 +30,5 @@ out/sub_goal065.csv from what is adopted, hand over. Rules R1-R5 and the no-boar
 
 - [ ] G6: public leaderboard score of out/sub_goal065.csv is below 0.65 (manual: the user pastes the score)
   EVIDENCE: pending
+
+ABANDON: G4 SampleSubmission.csv in this repo belongs to a different competition (9378 rows x 17 columns keyed on GEOID: coverage_gap_score, region, transport_gap, ...), so any valid submission for this challenge (ID,Target, 280961 rows) makes the check print "bad" by construction. The gate is not edited. Reversible: if the user approves pointing it at Test.csv, or supplies the real sample file, this line is removed and G4 re-checked. The equivalent substantive check against Test.csv is leaf-1.3.1-build B5.
