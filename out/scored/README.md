@@ -14,3 +14,4 @@ somewhere the pipeline does not touch.
 | sub_q_main_nosm.csv | not scored | no smoothing, control |
 
 Copied 2026-09-09 before rebuilding with the ERA5 soil profile and GDO SPI.
+| sub_x_lb2.csv | **0.683712087** | L1<=2 blend over the 16-file ledger (lb_blend.py). Predicted 0.683244; the 0.00047 miss is the D^2(all rows) vs D^2(public 30%) proxy error |

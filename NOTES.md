@@ -2718,3 +2718,35 @@ A submission that scores worse cannot lower the displayed best, so a probe costs
 nothing else. out/probe_ar.csv and out/probe_clim.csv are built by ar_model.py; the AR fit for the
 test uses Train.csv alone (ends 2015-08, before every test month) and its pooled slopes reproduce
 the independent train-era measurement exactly (h1 0.800 ... h7 0.556).
+
+# Session 11b — the blend landed, and the oracle's error is now measured
+
+    sub_x_lb2   0.683712087   against 0.692189463   -0.008477   NEW BEST
+
+Predicted 0.683244, so the miss is +0.000468 and the realised gain is 95% of the predicted one.
+This is the first change since the covariate-anomaly encoding to transfer at better than 80%.
+
+The miss is not noise, it is the one approximation in the method. The leaderboard's M_i are
+measured on the public 30%; the correction term uses E[(p_i-p_j)^2] over ALL 280,961 rows because
+we do not know which rows are public. The error is therefore 1/2 w'(D2_all - D2_pub)w, and from
+this result w'(D2_all - D2_pub)w = 0.00128 at ||w||_1 = 2.
+
+That number also says something about the split. On layout A the same procedure gives a proxy
+error of ~0.0001 under a RANDOM 30% split and ~0.0050 under a by-month split. Ours is 0.00047 --
+far closer to random, which is the regime where the validation simulation showed near-total
+transfer. Treat it as random-ish but do not bet the unbudgeted fit on it.
+
+Calibrated refit with sub_x_lb2 in the ledger (17 files), correction scaled as ||w||_1^2:
+
+    L1    raw predicted   calibrated   gain vs 0.683712
+     2      0.680127       0.680597      -0.003115
+     3      0.678071       0.679132      -0.004580
+     4      0.676475       0.678364      -0.005348
+     6      0.674074       0.678333      -0.005379
+
+L1<=6 buys nothing over L1<=4 once calibrated, at 50% more extrapolation, so out/sub_y_lb.csv is
+the L1<=4 fit. The calibration is an extrapolation from ONE point and is the weakest link here.
+
+Probes built for the next round: probe_clim (pure climatology), probe_ar (per-cell AR, ar_model.py)
+and probe_mlp (6 seeds of the FINAL-era MLP). All three are poor models; all three are directions
+the ledger does not have.
