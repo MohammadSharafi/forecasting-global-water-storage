@@ -2921,3 +2921,58 @@ over the existing isotropic anchors. This was the last untested feature family.
 Note the two arms also disagree about WHERE: directional helps at short horizons on Cvn2 and hurts
 at h5-h7 on Avn2/Bvn2/D. That is the signature of a feature fitting a window rather than a physical
 asymmetry, which is the same failure mode as the per-cell reliability row.
+
+# Session 11i — an anchor rescaling that validation accepts on all five layouts
+
+Blending on the BOARD proxy is dead (session 11d). Blending on VALIDATION LABELS is a different
+mechanism and had never been tried with the structurally different vectors. Fitting weights over
+(model, persistence, climatology, per-cell AR) with weights summing to one, on four layouts and
+scoring the fifth:
+
+    held out   baseline   blended    delta
+    Avn2        0.6332    0.6247    -0.0085
+    Bvn2        0.5253    0.5172    -0.0081
+    Cvn2        0.5176    0.5109    -0.0067
+    D           0.4960    0.4950    -0.0010
+    E           0.4766    0.4691    -0.0075
+    mean -0.0064, wins 5/5, clears 0.0003 on 5/5
+
+The fitted weights barely move between folds -- model +1.00, persistence -0.35, climatology -0.12,
+AR +0.47 -- which is what a real effect looks like rather than a fold-specific one.
+
+## The decomposition says it is not what it looks like
+    vectors allowed             mean held-out delta
+    model only                        --
+    + persistence + climatology     -0.0016
+    + AR only                       -0.0000
+    + persistence + clim + AR       -0.0064
+
+AR alone is worth NOTHING and persistence/climatology little, but together they are worth four
+times their sum. AR ~ a(h,cell) * tws_known, so the fitted pair is tws_known*(0.47*a - 0.35):
+a per-cell, per-horizon rescaling of the anchor, positive at h=1 where a~0.80 and negative by h=7
+where a~0.56. The DIFFERENCE between AR and persistence carries it; neither level does. That is
+also why `postcal.py`'s per-horizon calibration failed -- it scaled the change globally per horizon,
+with no per-cell term.
+
+## Two guards, because this session has already been fooled twice
+  * model-independence: weights fitted against the d0 model, correction applied to the DIFFERENT d1
+    model, held-out layout -- -0.0092/-0.0076/-0.0072/-0.0009/-0.0078, mean -0.0065, 5/5. The
+    correction does not depend on which model it is added to.
+  * horizon alignment on the test rows: probe_ar's implied slope on tws_known runs 0.782, 0.704,
+    0.655, 0.616, 0.577, 0.551, 0.507 against the train-era 0.800..0.556 -- monotone and correctly
+    indexed, not flat or scrambled.
+
+## What ships, and why the marginal form
+The submitted file already carries negative persistence and climatology weights, so adding the full
+correction would apply those twice. The INCREMENTAL piece is added instead:
+
+    corr = w4.(model,pers,clim,ar) - w3.(model,pers,clim)
+    w3 = [ 1.0818 -0.0195 -0.0623 ]      w4 = [ 1.0054 -0.3528 -0.1180  0.4654 ]
+
+measured on top of an already persistence/climatology-corrected baseline at -0.0086/-0.0024/
+-0.0038/-0.0029/-0.0061, mean **-0.0048**, 5/5, clearing 0.0003 on all five.
+
+out/sub_ac_armarg.csv = sub_z_lb + corr. Honest expectation: validation says -0.0048; this project's
+transfer ratio has been 0.77-0.83 for real structural changes and 5% for the one representation fix
+the board refused, so the board is worth somewhere between -0.0002 and -0.0040. That is a record if
+it transfers and nothing if it does not. It is NOT a route to 0.65.
