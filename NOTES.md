@@ -2628,3 +2628,74 @@ The observed board gap has a standard error of 0.00033 for this pair, so the hon
 true board gain somewhere in -0.0004 to +0.0013 -- which excludes the validation prediction. The
 disagreement is real, it is not selection, it is not target noise, and it is not the regime. I could
 not explain it, and saying so is more useful than a sixth hypothesis I cannot test.
+
+# Session 11 — the public scores are exact measurements, and we never used them
+
+For submissions with known public MSEs M_i and weights summing to 1,
+
+    MSE(sum w_i p_i) = sum_i w_i M_i - 1/2 sum_ij w_i w_j E[(p_i - p_j)^2]
+
+E[y^2] and every E[y p_i] cancel. The score of ANY affine combination of scored files is therefore
+computable from the CSVs plus the recorded scores, with no labels. Session 10 had the two-file case
+of this ("blending is excluded analytically") and drew the right conclusion from the wrong set: it
+tested main against r_prof and blend73 only, before sub_v_anwide existed.
+
+Verified on the board before being used: predicting sub_blend55 from the scores of sub_q_main and
+sub_blend73 alone gives 0.693726 against an actual 0.693725.
+
+## The ledger is 16 files, not 4
+Every scored file ever submitted is a free dimension. probe_persistence (0.8864), sub_h_l10_clim1
+(0.731800) and sub_i_lt_mlp (0.723121) are bad models and that is exactly why they are useful --
+they are the only vectors in the set that are not near-copies of each other.
+
+    L1 budget   exact public RMSE   gain vs 0.692189
+      1 (convex)     0.690611        -0.001578
+      2              0.683244        -0.008946
+      4              0.677769        -0.014421
+      8              0.672580        -0.019610
+
+## The budget is not a taste question, it was measured
+The weights are fitted on the public 30%; the standing is decided on the other 70%. `lb_blend.py
+simulate` runs the identical procedure on a layout where the labels are known -- hide 70%, fit on
+the 30%, score on the hidden part.
+
+    L1     A random   B random   A by-month   B by-month
+    1.0     -0.0021    -0.0012     +0.0006      -0.0004
+    2.0     -0.0079    -0.0169     -0.0026      -0.0122
+    4.0     -0.0098    -0.0208     -0.0015      -0.0137
+    8.0     -0.0099    -0.0213     +0.0026      -0.0113
+
+Under a random row split the oracle is near-exact and transfers essentially in full. Under a
+hostile by-month split it decays and the unbudgeted fit turns HARMFUL. L1<=2 was negative in all
+four scenarios; L1<=8 was not. Shipping L1<=2.
+
+## Ledger audit
+The bordered matrix [[S, g'],[g, Q]] with g_i=(S+q_i-M_i)/2 must be PSD, which bounds the hidden
+E[y^2]. A pinv-based test called the 16-file set infeasible; that was an artefact of cond(Q)=1e14.
+An eigenvalue scan finds min-eig -5e-12 at S=1.123, i.e. consistent. Well-conditioned subsets give
+std(y_test) in [0.72, 1.29] -- too loose to act on, so no shrinkage was attempted.
+sub_q_main, sub_q_alt and sub_q_base were byte-compared against out/scored/ and are unmodified.
+
+## Negatives from this session
+  * same-month spatial information does not exist. The mask is block-structured, not random: the
+    six block-anchor months are 100% observed and the other twelve have 4-65 observed cells out of
+    ~15,600. There is nothing to interpolate from at t.
+  * no leak in the calendar. All 18 target months are either absent from both files or are masked
+    test months; no test row's target is any row's given TWS_t.
+  * prediction amplitude is NOT miscalibrated. The submitted file's std is flat across horizons
+    (0.766 at h1 to 0.741 at h7) which looked like gross over-confidence, but each test horizon is
+    dominated by one month, and on validation -- where the same check can be done against labels --
+    the profile shrinks properly and the optimal per-horizon scale is 0.88-1.09. postcal's board
+    rejection was right.
+  * the test era is not a high-variance regime: observed test TWS std 0.9573 against a train
+    per-month mean of 0.8919.
+
+## Where the intrinsic ceiling actually is
+Per-cell calendar-exact persistence on Train.csv, and the best single global shrinkage of it:
+
+    h        1       2       3       4       5       6       7
+    persist  0.5737  0.6718  0.7242  0.7642  0.7999  0.8214  0.8562
+    optAR    0.5444  0.6250  0.6661  0.6954  0.7193  0.7328  0.7530
+
+Under the test's horizon mix that AR benchmark is 0.6352 on train-era data. Our board score is
+0.692. The gap is not explained by the feature set.
