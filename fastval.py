@@ -3,9 +3,18 @@
 The main pipeline's validation is honest but expensive: build_mats reads four external
 reanalysis archives and writes 200-column matrices, so trying an idea costs the better part of
 an hour and cannot be done on a machine that has not downloaded the data. This rebuilds the
-same framing from the released columns alone -- 40x40 cells, 2002-04..2015-09 -- and trains a
+same framing from the released columns alone -- every land cell in Train.csv -- and trains a
 single LightGBM on ~40 features. It is worse in absolute terms than the real pipeline and it is
 meant to be: what it buys is a fast, reproducible A/B on a structural question.
+
+What it CANNOT do
+-----------------
+Answer whether a feature family helps the REAL model, when its own baseline lacks that family.
+Its deepest memory is d2 and its only spatial feature is one 4-neighbour mean, where the pipeline
+carries lag1..lag12, dev24, trend24, sd24, anom_persist and 39 neighbourhood/anchor features. The
+`mem` arm duly "wins" by -0.0099 here and is worth +0.0002 there, because it is measuring the value
+of long memory in general rather than anything the pipeline is missing. Check the incumbent's
+feature list before believing an arm.
 
 Framing, identical to the real task
 -----------------------------------
@@ -134,7 +143,11 @@ def boxmean(v, r, side=None):
     """Mean of `v` over a (2r+1) box around each cell. side='w'/'e' takes only the
     columns strictly west/east of the cell -- the Amazon drains west to east, so the
     upstream half is not the same field as the downstream half."""
-    G = np.full((NLA, NLO), np.nan); G[np.unravel_index(ORD, (NLA, NLO))] = v[ORD]
+    # ORD[i] is the cell occupying flat grid position i, or -1 where the grid has no land
+    # cell. Indexing with -1 silently wraps on the write and throws on unravel_index, so the
+    # empty positions have to be masked out on both the read and the write below.
+    ok = ORD >= 0
+    G = np.full(NLA * NLO, np.nan); G[ok] = v[ORD[ok]]; G = G.reshape(NLA, NLO)
     P = np.pad(G, r, constant_values=np.nan)
     acc = np.zeros_like(G); cnt = np.zeros_like(G)
     for da in range(-r, r + 1):
@@ -147,7 +160,7 @@ def boxmean(v, r, side=None):
             m = np.isfinite(w)
             acc[m] += w[m]; cnt[m] += 1
     out = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan)
-    res = np.full(NC, np.nan); res[ORD] = out.ravel()
+    res = np.full(NC, np.nan); res[ORD[ok]] = out.ravel()[ok]
     return res
 
 
