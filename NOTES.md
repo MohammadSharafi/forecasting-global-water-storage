@@ -3000,3 +3000,48 @@ K=500 scores -0.0050 against the shipped K=100's -0.0048 while its worst layout 
 -0.0024. The difference is 0.0002, far inside the noise this project has repeatedly been burned by,
 so the shipped configuration stays at K=100. Choosing K on a 0.0002 validation difference is the
 same mistake as the L1=4 blend.
+
+# Session 11j — the blends were fitted to the PUBLIC 30%, and the final standing is the other 70%
+
+The entrant is right that the objective is the private score, and this had been under-weighted.
+sub_x_lb2, sub_y_lb and sub_z_lb were all fitted to public leaderboard scores. How much of each
+one's gain depended on public-versus-private row structure is computable, because
+
+    actual_public - predicted = 1/2 w'(D2_all - D2_pub) w = 0.35 w'(D2_priv - D2_pub) w
+
+so the prediction error IS, by construction, the part driven by the difference between public and
+private rows. Expressed as a share of each file's incremental MSE gain:
+
+    file         predicted gain   realised   evaporated   public-specific
+    sub_x_lb2        0.012304     0.011664    0.000640           5%
+    sub_y_lb         0.009844     0.002724    0.007120          72%
+    sub_z_lb         0.005880     0.000034    0.005846          99%
+
+sub_z_lb displays 0.681692 against sub_x_lb2's 0.683712, but essentially ALL of that 0.0020 edge is
+an artefact of fitting the board it is displayed on. On the private 70% the ordering may well
+reverse. **For the final standing sub_x_lb2 is the safer of the three**, and the displayed best is
+the wrong thing to optimise if the private split decides the result.
+
+This does not touch the AR work: ar_blend fits on VALIDATION LABELS across five layouts, never on
+the board, so it carries none of this risk.
+
+## Two AR candidates, on different bases
+    out/sub_ac_armarg.csv      = sub_z_lb   + corr   (best public base, 99% of its edge public-fitted)
+    out/sub_ad_armarg_lb2.csv  = sub_x_lb2  + corr   (private-safer base, 5% evaporated)
+
+Both are justified: sub_x_lb2 also carries negative persistence and climatology weights
+(pers -0.049, clim1 -0.451), which is the already-corrected situation the marginal form was
+validated on. Submitting both costs two slots and covers either selection mechanism.
+
+## Determinism guard
+The a0 arm (ARF=0) and the d0 arm (DIRF=0) are the same configuration with the same seeds.
+max|a0 - d0| = 0.000e+00 on both seeds of Avn2: training is bit-deterministic, so every
+control/treatment delta in this session differed only by the switch under test. The directional
+rejection at -0.0002 and the AR results are not confounded by run-to-run variation.
+
+## On ceilings
+At 0.714 these notes said "the stack is at its information limit". We are 0.032 better. Every
+ceiling called here has been broken by a REPRESENTATION failure rather than by new information --
+raw millimetres instead of per-cell anomalies, the anomaly block existing only at 1 degree, never
+using our own public scores. "No information left" has been the wrong frame three times and should
+not be asserted again.
