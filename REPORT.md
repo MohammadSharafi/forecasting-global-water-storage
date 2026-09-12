@@ -220,6 +220,49 @@ that separates them is physical: **aggregate a noisy driver, not a smooth state.
 average out between cells; the TWS field is already smooth, so a neighbourhood mean of `d1` is very
 nearly `d1`.
 
+### 3.2d The fourth finding: every precipitation the model saw was a reanalysis
+
+Precipitation is this model's strongest forcing — `aw_an_e5Pz_acc` is the second feature by gain at
+7.1% — and until now every version of it came from the same kind of source. ERA5, NCEP-R1 and
+NCEP-R2 are all *reanalyses*: physical models nudged toward observations. Where rain gauges are
+sparse they are the best available estimate; where gauges are dense they are still a model.
+
+**GPCC Full Data Monthly v2022** is the other kind of number: interpolated rain gauges, with a gauge
+count per cell. It is not a better product than ERA5 — in the empty parts of the world it is worse —
+but it is an *independent* one, and the correlation says so. Its accumulated anomaly correlates
+**0.597** with ERA5's at the cell and **0.785** as a regional mean. Had those been near 1.000 the
+block would have been a duplicate by construction, which is exactly the check that was run before any
+model was trained.
+
+The encoding is not new; that is the point. §3.1 established that raw millimetres are unusable to a
+model with no coordinates, so GPCC enters through the same path that finding created: the per-cell
+calendar-month z-score, the accumulation over `(t_known, t]`, fixed 3/6/12-month antecedent windows,
+and the regional means of §3.2c. Fifteen columns, including the gauge count itself, so the model can
+separate the dense-network regime from the empty one.
+
+| layout | shipped | + GPCC | delta |
+|---|---|---|---|
+| Avn2 | 0.6343 | 0.6329 | **−0.0014** |
+| Bvn2 | 0.5259 | 0.5245 | **−0.0014** |
+| Cvn2 | 0.5183 | 0.5144 | **−0.0039** |
+| D | 0.4964 | 0.4938 | **−0.0026** |
+| E | 0.4772 | 0.4764 | **−0.0007** |
+
+Mean **−0.0020**, winning on all five, against a research estimate of −0.0010 — the first candidate
+in this goal to clear the every-layout bar, and double what was predicted for it. Provenance was
+checked rather than assumed: every treatment run reports 355 features against the control's 340.
+
+Measured **jointly** with the anchor rescaling of §3.4 — by re-fitting that correction against the
+GPCC model's own predictions rather than assuming the two gains add — the pair gives Avn2 −0.0108,
+Bvn2 −0.0100, Cvn2 −0.0102, D −0.0032, E −0.0083: **mean −0.0085, winning 5/5 and clearing −0.003 on
+every layout**, which no earlier change in this project has done. It is the largest held-out gain in
+its history.
+
+Compliance: rain gauges only, so no GRACE and no model that assimilates it; a static release covering
+1891–2020 against a test needing months ≤ 2018-12, so every value read has a source date ≤ t; the
+climatology is built from history months alone. Licence CC BY 4.0, Deutscher Wetterdienst, DOI
+10.5676/DWD_GPCC/FD_M_V2022_100.
+
 ### 3.3 Model and post-processing
 
 Each model predicts the **residual** `TWS(t+1) − TWS(last observed)`. The ensemble weight is fitted
