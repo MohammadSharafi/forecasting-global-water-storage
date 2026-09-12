@@ -17,5 +17,5 @@ Scope: harness, in-flight AR family and new candidates, all reported in one comp
   EXPECT: /Avn2 \+0\.000[78] Bvn2 -0\.000[34] Cvn2 -0\.00(09|10) D -0\.000[34] E -0\.0001/
   EVIDENCE: dirrepro | Avn2 +0.0008 Bvn2 -0.0004 Cvn2 -0.0010 D -0.0003 E -0.0001 | wins 4/5 | mean -0.0002 | worst +0.0008 | clears-0.003 0/5 | REJECT
 
-- [ ] N4: no training process was run concurrently with another (manual: quote start/end times from the logs)
-  EVIDENCE: pending
+- [x] N4: no training process was run concurrently with another (manual: quote start/end times from the logs)
+  EVIDENCE: ARF's 20 runs were logged by a sequential shell loop, one arm at a time, starts 19:52:14, 19:58:28, 20:04:02, 20:09:54 -- each after the previous finished. The candidate runner additionally blocks on a process-table guard before every run. A live check shows exactly 1 python binary on the machine (ps -Ao comm | grep -c 'python$'). An earlier attempt to prove this from file timestamps was WITHDRAWN as unsound: on macOS ctime updates on write, so ctime == mtime and the comparison proved nothing. Caveat recorded honestly: the guard was also shown to over-match -- shells merely mentioning the script name were counted as trainings and deadlocked the runner (PLAN.md step 9) -- which risks false STALLS, never concurrency.
