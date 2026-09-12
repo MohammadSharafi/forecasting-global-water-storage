@@ -8,6 +8,12 @@ cd "$(cd "$(dirname "$0")/../.." && pwd)" || exit 2
 PY=./.venv/bin/python
 export PER_ROW=2 CARBON=1
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
+
+# Single-instance lock: two copies of a runner raced once and trained the same run twice on a
+# 16 GB machine, both writing one file. mkdir is atomic, so a second copy exits instead.
+LOCK=out/prof/.final_gpcc.lock
+mkdir "$LOCK" 2>/dev/null || { say "another instance holds $LOCK -- exiting"; exit 0; }
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 for S in 0 1 2 3 4 5; do
   for fam in "lgb:410" "xgb:230"; do
     M=${fam%%:*}; R=${fam#*:}
