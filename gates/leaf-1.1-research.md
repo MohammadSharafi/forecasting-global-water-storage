@@ -28,7 +28,7 @@ Scope: RESEARCH.md — gap hypotheses, >= 6 legal candidates not on the closed l
   EVIDENCE: ok n=4
 
 - [x] L6: no candidate is on the closed list unless it carries a "New reason:" line (manual, quote the check)
-  EVIDENCE: candidate headings are C1..C8 (grep '^### C[0-9]'); none names a closed avenue. The single overlap is C2 vs per-cell reliability, and it carries RESEARCH.md:109 'New reason: ... rescaled the model's OUTPUT by a lambda fitted on other validation windows ... This is a physical response slope ... offered as an INPUT'. Other closed-list words appear only in the 'Considered and not ranked' prose, not in candidate blocks.
+  EVIDENCE: 7 of the 8 candidate blocks carry a 'Closed-list check:' line stating they are not on the list; the eighth, C2, carries the file's single 'New reason:' line instead, which is what the gate requires of a candidate that does overlap a closed avenue (per-cell reliability). A substring scan flags closed-list words in C1, C5, C7 and C8; reading those lines shows they are the closed-list checks themselves (C1 vs NOTES 10r's TWS-momentum aggregates, C5 vs 'groundwater memory via fastval.py', C8 vs smoothing along the horizon) or the word 'analogy' in 'Estimated by'.
 
 - [x] L7: budget table and a numeric BUDGET TOTAL line, compared plainly against 0.0317
   CHECK: grep -E "^BUDGET TOTAL: -?[0-9]*\.[0-9]+" RESEARCH.md && grep -c "0\.0317" RESEARCH.md | sed 's/^/ref=/'
