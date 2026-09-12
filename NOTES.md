@@ -3196,3 +3196,29 @@ isotropic and already carried by the existing anchors.
 Twelve candidates have now been measured under this goal and every one was rejected. The AR anchor
 rescaling remains the only change in the project's history to win on all five layouts and hold at
 every shrinkage and budget setting tried.
+
+## Session 12 — the h=1 idea, and the reasoning error behind it
+Ranking horizons by our MARGIN OVER A PER-CELL AR LINE made h=1 look like the weak spot: we beat
+that line by 0.0426 at h=1 and by 0.136-0.191 at h>=5, and h=1 is 33.3% of the test. Pricing that
+apparent gap gave -0.0140 (h1 to 0.45) or -0.0336 (h1 matching the long-horizon margin), the biggest
+numbers this project had ever put on an untested idea. 93 of 354 features are constant or missing on
+h=1 rows, which looked like the mechanism.
+
+Both the framing and the mechanism were wrong.
+
+The framing: a margin over a baseline measures how badly THE BASELINE degrades, not our headroom.
+At h=7 the AR line collapses to 0.7352 because a seven-month-old observation says little while the
+model has six months of forcing since the anchor; at h=1 the line is strong at 0.5390 because
+one-month persistence is genuinely strong. In absolute terms our h=1 of 0.4963 already beats
+train-era persistence (0.5737) and the best global AR shrinkage (0.5444) by 0.0481.
+
+The mechanism: a specialist trained on the h=1 slice alone was WORSE there.
+
+    h1spec            D +0.0206  E +0.0053  wins 0/5  ABANDON-EARLY (two losing layouts)
+    h1spec_wholescore D +0.0066  E +0.0017  wins 0/5  ABANDON-EARLY
+
+Restricting to h=1 discards 72% of the training rows (249,724 of 886,907 on D) and the other
+horizons were still teaching it something it needs. The dead-feature count was real but not the
+binding constraint. What remains is the structural reading: at h=1 t_known == t, so there is no
+forcing gap to exploit, and the rain that would explain t+1 falls DURING t+1, which is prohibited.
+Less to know, not less well modelled.
