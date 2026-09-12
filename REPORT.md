@@ -263,6 +263,54 @@ Compliance: rain gauges only, so no GRACE and no model that assimilates it; a st
 climatology is built from history months alone. Licence CC BY 4.0, Deutscher Wetterdienst, DOI
 10.5676/DWD_GPCC/FD_M_V2022_100.
 
+### 3.2e The fifth finding: the model had no groundwater or surface-water store
+
+§3.2d added an independent *precipitation*. This adds an independent *storage*. The model's storage
+features are soil water and snow, both from reanalysis; nothing in it represents groundwater, lakes,
+wetlands or reservoirs, and those are precisely the compartments that make total storage lag rainfall
+by months rather than days.
+
+**WaterGAP 2.2e** (ISIMIP3a, `obsclim` forcing, `histsoc` human water use) is a global hydrological
+model whose `tws` is the summed storage of all compartments. It is a *forward* model driven by
+observed meteorology: it does not assimilate GRACE, which is what §5's rule forbids. Its storage
+change correlates **0.436** with ERA5's modelled total storage and **0.303** with NCEP's — related,
+not redundant.
+
+Encoded as a *state* rather than a flux, through the §3.1 path: the per-cell calendar-month z-score
+at t and at the anchor, their difference, the 3/6/12-month mean state, and the §3.2c regional means.
+
+| layout | + GPCC | + GPCC + WaterGAP | delta |
+|---|---|---|---|
+| Cvn2 | 0.5144 | 0.5119 | **−0.0025** |
+| D | 0.4938 | 0.4886 | **−0.0052** |
+| E | 0.4764 | 0.4722 | **−0.0042** |
+
+Mean **−0.0040** with no layout losing, measured *on top of* GPCC, against a research estimate of
+−0.0025. It is the largest single block this project has measured. Two layouts were not run: the
+entrant's last day left one submission and the machine was needed for the final build, so breadth of
+validation was traded for a configuration decision — recorded here rather than left implicit.
+
+### 3.2f A piece of the pipeline that was costing score
+
+Three arms on two layouts, each removing one thing the pipeline had carried for many sessions, with
+the adopted GPCC block present in every arm:
+
+| removed | D | E | mean |
+|---|---|---|---|
+| horizon-mix training reweighting | −0.0012 | −0.0001 | **−0.0007** |
+| recency ramp on training weights | +0.0000 | +0.0000 | +0.0000 |
+| both | −0.0012 | −0.0001 | −0.0007 |
+
+Dropping both equals dropping the horizon mix alone, on both layouts, and the ramp is exactly zero on
+both — the internal consistency is what makes this signal rather than noise. `HMIX` reweights training
+rows toward the test's horizon mix, and the validation layouts reproduce that mix by construction, so
+the reweighting looked free there while costing a little on the real task.
+
+Adopted because it never hurts and costs nothing. Reported at its true size: −0.0007 on validation is
+roughly −0.0006 on the board, a rounding error against the 0.026 that separates this entry from tenth
+place. The hypothesis that drove the test — that accumulated structure was holding the pipeline back —
+is directionally right and an order of magnitude too small to be the explanation.
+
 ### 3.3 Model and post-processing
 
 Each model predicts the **residual** `TWS(t+1) − TWS(last observed)`. The ensemble weight is fitted
