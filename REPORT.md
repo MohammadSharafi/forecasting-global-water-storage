@@ -574,6 +574,7 @@ docstring.
 | leaderboard blend, ‖w‖₁≤4 over 17 files | **0.681717** — transfer 27.6% |
 | leaderboard blend, ‖w‖₁≤2 over 19 files | **0.681692** — transfer 0.6%, avenue closed |
 | **the AR anchor rescaling on the least public-fitted base (`out/sub_goal065.csv`, §3.4)** | **0.682847** — inside the predicted 0.6797–0.6835; −0.000865 against its own base, an 18% transfer of a −0.0048 validation gain, and +0.001155 short of the displayed best because that base was chosen for private safety rather than display |
+| **the same correction on the displayed-best base (`out/sub_ac_armarg.csv`)** | **0.679786** — the record. Its score was *predicted* at 0.679683 from three already-scored files by the affine identity of §3.4 and landed 0.000103 away; −0.001907 against the base, a 40% transfer where the same correction managed 18% on the other base |
 
 The submitted file is `out/sub_z_lb.csv` at **0.681692**. The single-model file behind it is
 `out/sub_v_anwide.csv` at 0.692189, which is what §3.1–§3.3 describe; §3.4 accounts for the

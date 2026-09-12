@@ -3147,3 +3147,28 @@ against an actual 0.693725.
 So the standing choice is now explicit:
   * best displayed:  sub_ac_armarg.csv, implied 0.6797, built on a base whose edge was 99% public-specific
   * safest private:  sub_goal065.csv, measured 0.682847, built on a base whose edge was 5% public-specific
+
+## Session 12 postscript — the predicted file landed, and it is the record
+    sub_ac_armarg   0.679785572   predicted 0.679683, miss +0.000103   NEW BEST (was 0.681692450)
+
+This is the third non-optimised use of the affine identity and the third to land: sub_blend55 within
+1e-6, sub_ac_armarg within 1e-4. The distinction that matters is now measured twice over. Weights
+CHOSEN BY AN OPTIMISER to minimise the predicted public score missed by +0.00047 at ||w||_1 = 2 and
++0.0052 at 4, because the optimiser exploits the difference between D2 over all rows and D2 over the
+public 30%. Weights FIXED BY ALGEBRA for a file that already exists carry no such selection, and
+predict to 1e-4.
+
+The same correction, measured on two bases, gives the transfer ratio twice:
+    sub_x_lb2  -> sub_goal065     -0.000865 board, 18% of the -0.0048 validation gain
+    sub_z_lb   -> sub_ac_armarg   -0.001907 board, 40% of the -0.0048 validation gain
+One correction, one validation number, two boards ratios a factor of two apart. The transfer ratio
+is a property of the pairing, not a constant of the project, and any future forecast should quote a
+range rather than a point.
+
+## What is NOT being done, deliberately
+The correction's magnitude could be scaled: p(t) = sub_z_lb + t*corr is an affine combination of two
+scored files, so the identity gives its public score for any t, and a minute of arithmetic would
+find the t that minimises it. That is fitting a weight on the public leaderboard, which the goal's
+own rules forbid and which is exactly the mechanism that made the session-11 blends evaporate on the
+private split. The correction is already at the magnitude ar_blend fitted on validation labels
+across five layouts (w4 = [1.0054, -0.3528, -0.118, 0.4654]). It stays there.
