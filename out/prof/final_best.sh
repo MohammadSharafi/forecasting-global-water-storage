@@ -8,7 +8,7 @@ LOCK=out/prof/.final_best.lock
 mkdir "$LOCK" 2>/dev/null || { echo "another instance holds the lock"; exit 0; }
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 say(){ printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*"; }
-while pgrep -f "[w]gap_run" >/dev/null 2>&1; do sleep 30; done
+while pgrep -f "[a]blate_structure|[w]gap_run" >/dev/null 2>&1; do sleep 30; done
 say "machine free; training FINAL with XF=gpcc,wgap"
 for S in 0 1 2 3 4 5; do
   for fam in "lgb:410" "xgb:230"; do
@@ -16,7 +16,7 @@ for S in 0 1 2 3 4 5; do
     P=out/mats/pred_FINALvn2_${M}_v5x_noll_s${S}_bw1.npy
     [ -f "$P" ] && { say "$M s$S exists"; continue; }
     say "$M s$S rounds=$R"
-    XF=gpcc,wgap DROPF="bigsa,gdo" WEIGHTS=ramp HMIX=test SEED=$S TAG=_bw1 \
+    XF=gpcc,wgap DROPF="bigsa,gdo" WEIGHTS=ramp HMIX="" SEED=$S TAG=_bw1 \
       $PY run_models.py FINALvn2 $M v5x_noll_sa $R > out/prof/fb_${M}_s${S}.log 2>&1 \
       || { say "  FAILED"; tail -6 out/prof/fb_${M}_s${S}.log; exit 4; }
   done

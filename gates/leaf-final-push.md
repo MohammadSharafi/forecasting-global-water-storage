@@ -7,10 +7,10 @@ Scope: find and exploit whatever separates a five-submission entrant at 0.65 fro
   EXPECT: /sections=[2-9]/
   EVIDENCE: sections=4
 
-- [ ] FP2: the training-structure ablation is measured on two layouts (horizon-mix weights, recency ramp, both)
+- [x] FP2: the training-structure ablation is measured on two layouts (horizon-mix weights, recency ramp, both)
   CHECK: grep -hc "^ab_n" out/goal065/heldout.txt out/prof/ablate_run.log 2>/dev/null | head -1 | sed 's/^/arms=/'
   EXPECT: /arms=[1-9]/
-  EVIDENCE: pending
+  EVIDENCE: arms=3
 
 - [x] FP3: WaterGAP measured against the GPCC control
   CHECK: tail -1 out/goal065/wgap.txt
