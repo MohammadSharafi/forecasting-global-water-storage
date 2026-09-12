@@ -12,10 +12,10 @@ Scope: every measurement of this goal recorded, failures included; REPORT closed
   EXPECT: ok
   EVIDENCE: pending
 
-- [ ] R3: REPORT.md §4 names every rejected or abandoned candidate from heldout.txt
+- [x] R3: REPORT.md §4 names every rejected or abandoned candidate from heldout.txt
   CHECK: ./.venv/bin/python -c "import re;r=open('REPORT.md').read();s=r[r.index('## 4.'):r.index('## 5.')];c=[l.split(' |')[0] for l in open('out/goal065/heldout.txt') if re.search(r'\| (REJECT|ABANDON-EARLY)$',l.strip())];m=[x for x in c if x not in s];print('ok n=%d'%len(c) if not m else 'missing: '+','.join(m))"
   EXPECT: ok
-  EVIDENCE: pending
+  EVIDENCE: ok n=2
 
 - [ ] R4: REPORT.md §8 has a row for sub_goal065
   CHECK: ./.venv/bin/python -c "r=open('REPORT.md').read();print('ok' if 'sub_goal065' in r[r.index('## 8.'):] else 'bad')"

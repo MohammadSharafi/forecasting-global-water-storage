@@ -4,7 +4,7 @@ Scope: measure the adopted changes TOGETHER (not as a sum), decide whether the a
 
 - [ ] B1: the jointly measured set ends in a contract summary line named ADOPTED-SET
   CHECK: tail -1 out/goal065/adopted_set.txt
-  EXPECT: /^ADOPTED-SET \| Avn2 \S+ Bvn2 \S+ Cvn2 \S+ D \S+ E \S+ \| wins \d\/5 \| mean \S+ \| worst \S+ \| clears-0\.003 \d\/5 \| (ADOPT-0\.65|HELPS-NOT-0\.65|REJECT|ABANDON-EARLY)$/
+  EXPECT: /^ADOPTED-SET \| Avn2 \S+ Bvn2 \S+ Cvn2 \S+ D \S+ E \S+ \| wins \d\/5 \| mean \S+ \| worst \S+ \| clears-0\.003 \d\/5 \| (ADOPT-0\.65|HELPS-NOT-0\.65|REJECT|ABANDON-EARLY)\s*$/
   EVIDENCE: pending
 
 - [ ] B2: the set's members are listed, each with its own heldout.txt line
