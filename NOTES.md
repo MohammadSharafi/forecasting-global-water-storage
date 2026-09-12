@@ -3082,3 +3082,36 @@ forcing), so the naive sum is an upper bound, not an expectation.
   * Two gate regexes written here anchored with `$` against command output that ends in a newline,
     so they could never match whatever the content. Fixed to `\s*$`; the required content of the
     line was not changed and the thresholds were not touched.
+
+## Every measurement, copied verbatim from out/goal065/heldout.txt
+```
+arseas | Avn2 +0.0003 Bvn2 +0.0001 Cvn2 +0.0000 D +0.0000 E +0.0000 | wins 0/5 | mean +0.0001 | worst +0.0003 | clears-0.003 0/5 | REJECT
+ar2 | Avn2 -0.0000 Bvn2 +0.0000 Cvn2 +0.0001 D +0.0001 E -0.0000 | wins 2/5 | mean +0.0000 | worst +0.0001 | clears-0.003 0/5 | REJECT
+arf | Avn2 -0.0009 Bvn2 +0.0026 Cvn2 +0.0027 D -0.0003 E -0.0003 | wins 3/5 | mean +0.0008 | worst +0.0027 | clears-0.003 0/5 | REJECT
+c1 | Avn2 n/a Bvn2 n/a Cvn2 n/a D +0.0012 E +0.0008 | wins 0/5 | mean +0.0010 | worst +0.0012 | clears-0.003 0/5 | ABANDON-EARLY
+ADOPTED-SET | Avn2 -0.0086 Bvn2 -0.0024 Cvn2 -0.0038 D -0.0029 E -0.0061 | wins 5/5 | mean -0.0048 | worst -0.0024 | clears-0.003 3/5 | HELPS-NOT-0.65
+```
+
+Read it plainly: nothing helped. arseas and ar2 add nothing to the AR correction; arf (the same AR
+quantity handed to the model as FEATURES rather than applied after it) is worse than the control on
+three of five layouts; c1 lost on the two fastest layouts and was stopped before the three slow ones
+were paid for. The only change that wins on all five layouts remains the marginal AR anchor
+rescaling at mean -0.0048, and that was already measured before this goal began.
+
+## What shipped
+out/sub_goal065.csv = out/scored/sub_x_lb2.csv + the marginal AR correction, nothing else.
+Weights w3 [1.0818, -0.0195, -0.0623], w4 [1.0054, -0.3528, -0.118, 0.4654]; the correction has mean
+-0.0067, std 0.0866, range [-0.72, 0.60]. Final matrix FINALvn2, compliance audit passes.
+
+The base is deliberately NOT the best-displaying file. sub_z_lb shows 0.681692 against sub_x_lb2's
+0.683712, but 99% of sub_z_lb's incremental public gain was public-specific against 5% for
+sub_x_lb2, and the goal is explicit that the private 70% must not be hurt.
+
+Expected board, from this project's own transfer ratios applied to -0.0048 on a 0.683712 base:
+0.679728 at x0.83, 0.680016 at x0.77, 0.683472 at x0.05 (the worst transfer ever seen here). So
+about 0.6797-0.6835, most likely ~0.680 -- better than the displayed 0.681692, and nowhere near 0.65.
+
+## G2, closed honestly
+G2 asked for a change set winning 5/5 with a mean <= -0.041. The adopted set wins 5/5 at -0.0048,
+which is 8.5x too small. Nothing measured in this goal came close, and RESEARCH.md's BUDGET TOTAL
+of 0.0000 said so before the measuring started. The threshold was never moved.

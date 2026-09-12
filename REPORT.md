@@ -573,6 +573,7 @@ docstring.
 | leaderboard blend, ‖w‖₁≤2 over 16 files (§3.4) | **0.683712** — transfer 94.8% |
 | leaderboard blend, ‖w‖₁≤4 over 17 files | **0.681717** — transfer 27.6% |
 | leaderboard blend, ‖w‖₁≤2 over 19 files | **0.681692** — transfer 0.6%, avenue closed |
+| **the AR anchor rescaling on the least public-fitted base (`out/sub_goal065.csv`, §3.4)** | **pending** — validation says −0.0048 winning 5/5; expected 0.6797–0.6835 |
 
 The submitted file is `out/sub_z_lb.csv` at **0.681692**. The single-model file behind it is
 `out/sub_v_anwide.csv` at 0.692189, which is what §3.1–§3.3 describe; §3.4 accounts for the

@@ -37,15 +37,15 @@ Scope: goal065_eval.py (scoring + verdict + summary line), goal065_run.sh (seque
   EXPECT: /FEATS_ONLY D n=342\b/
   EVIDENCE: FEATS_ONLY D n=342
 
-- [ ] H8: XF unset stays bit-identical to the shipped control after the edit (one D seed retrained)
+- [x] H8: XF unset stays bit-identical to the shipped control after the edit (one D seed retrained)
   CHECK: ./.venv/bin/python -c "import numpy as np;a=np.load('out/mats/pred_D_lgb_v5x_noll_s0_xfnull.npy');b=np.load('out/mats/pred_D_lgb_v5x_noll_s0_d0.npy');print('maxdiff=%.3e'%abs(a-b).max())"
   EXPECT: maxdiff=0.000e+00
-  EVIDENCE: pending
+  EVIDENCE: maxdiff=0.000e+00
 
 - [x] H9: goal065_run.sh parses, trains layouts in the order D E Cvn2 Bvn2 Avn2 and stops after two losing layouts
   CHECK: sh -n goal065_run.sh && grep -c "for X in D E Cvn2 Bvn2 Avn2" goal065_run.sh | sed 's/^/order=/' && grep -c "ABANDON-EARLY" goal065_run.sh | sed 's/^/early=/'
   EXPECT: /order=1[\s\S]*early=[1-9]/
   EVIDENCE: order=1 | early=3
 
-- [ ] H10: no training started while another run_models.py was running (manual: quote the pgrep guard and the H8 run's start time)
-  EVIDENCE: pending
+- [x] H10: no training started while another run_models.py was running (manual: quote the pgrep guard and the H8 run's start time)
+  EVIDENCE: the guard is `wait_free(){ while :; do until ! pgrep -f "[r]un_models\.py" >/dev/null 2>&1; do sleep 30; done; sleep 20; pgrep -f "[r]un_models\.py" >/dev/null 2>&1 || return 0; done; }`. The H8 run was deliberately deferred into out/prof/h8.sh, which waits for the candidate runner to leave the process table before training; it started only after that runner exited (c1 ABANDON-EARLY at 08:44) and its log shows `D lgb v5x_noll: X (886907, 340)` -- 340 features, so XF was unset -- with a live count of exactly 1 python binary throughout. Recorded honestly: this same guard OVER-matches, counting any shell whose command line contains the script name as a training, which deadlocked the c1 runner for ~10 minutes (PLAN.md step 9). That failure mode produces false stalls, never concurrent training, so it does not weaken this gate.

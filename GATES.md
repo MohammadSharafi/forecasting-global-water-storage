@@ -23,12 +23,14 @@ out/sub_goal065.csv from what is adopted, hand over. Rules R1-R5 and the no-boar
   EXPECT: ok
   EVIDENCE: pending
 
-- [ ] G5: NOTES.md has a "Session 12 — goal 0.65" section with every measurement, including failures; REPORT.md §4/§8 updated
+- [x] G5: NOTES.md has a "Session 12 — goal 0.65" section with every measurement, including failures; REPORT.md §4/§8 updated
   CHECK: grep -q "Session 12 — goal 0.65" NOTES.md && echo ok
   EXPECT: ok
-  EVIDENCE: pending
+  EVIDENCE: ok
 
 - [ ] G6: public leaderboard score of out/sub_goal065.csv is below 0.65 (manual: the user pastes the score)
   EVIDENCE: pending
 
 ABANDON: G4 SampleSubmission.csv in this repo belongs to a different competition (9378 rows x 17 columns keyed on GEOID: coverage_gap_score, region, transport_gap, ...), so any valid submission for this challenge (ID,Target, 280961 rows) makes the check print "bad" by construction. The gate is not edited. Reversible: if the user approves pointing it at Test.csv, or supplies the real sample file, this line is removed and G4 re-checked. The equivalent substantive check against Test.csv is leaf-1.3.1-build B5.
+ABANDON: G2 The goal needs a change set winning 5/5 with a mean held-out gain <= -0.041. The best that exists wins 5/5 at mean -0.0048 (Avn2 -0.0086, Bvn2 -0.0024, Cvn2 -0.0038, D -0.0029, E -0.0061), which is 8.5x too small, and it was already measured before this goal began. Everything measured under the goal failed: arseas mean +0.0001 (wins 0/5), ar2 +0.0000 (2/5), arf +0.0008 (3/5), c1 +0.0010 (0/5, stopped early after D +0.0012 and E +0.0008). RESEARCH.md said this in advance with BUDGET TOTAL: 0.0000 against the 0.0317 required; its largest single estimate was -0.0025 and the largest validation gain in this project's whole history is -0.0156. The threshold was never moved and no layout was hidden. Reversible: if a future candidate clears -0.041 on 5/5, delete this line and re-run the gate.
+ABANDON: G6 Not impossible, and not mine: G6 is the manual gate that records the public score of out/sub_goal065.csv, which only the user can obtain because only they can submit (one submission per day). Handing over with it open. To close it: submit out/sub_goal065.csv, then replace this line with the score and tick G6. Expected 0.6797-0.6835, most likely ~0.680.
