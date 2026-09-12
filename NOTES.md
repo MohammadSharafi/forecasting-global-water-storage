@@ -3252,3 +3252,52 @@ decides the standing, the ordering may be the other way round.
 
 Caveats: six seeds per family rather than sixteen, and no horizon-1 splice (worth -0.0005), so it is
 a slightly weaker build than the shipped recipe.
+
+## Session 12 last day — what the leaderboard taught, and the two blocks that worked
+The entrant's screenshot of the standings settled a question six sessions of measurement had not:
+
+    6  Gliding Moran  0.647079224   8 submissions
+    10 awxlong        0.653388234   5 submissions
+    11 Ramjas         0.655934963   8 submissions
+
+Five submissions cannot be fitted to a leaderboard. So a straightforward method reaches 0.653 while
+this project sits at 0.6792 after roughly thirty. The hypothesis carried since session 3 -- that
+sub-0.65 implied an external gap-free TWS product -- is REFUTED. Every "information ceiling" claim in
+these notes measured THIS pipeline and called it the problem's limit. Against the board's own
+persistence baseline of 0.8864 we are at 0.766 and rank 10 is at 0.738: a 3.8% relative gap, real
+and unexplained by anything in the rules.
+
+The challenge rules (fetched from the competition page) forbid only AutoML and future GRACE leakage,
+and explicitly allow satellite data, Copernicus resources and openly available pretrained models.
+Nothing in them blocks what the leaders are doing.
+
+## What the literature does that this project never tried
+Searches on GRACE TWSA forecasting return one dominant approach: per-cell LSTM/BiLSTM sequence models
+over each cell's own history plus climatic drivers, often with EOF decomposition, benchmarked against
+XGBoost. This project built a per-row gradient-boosted model, and rejected a U-Net over global maps
+for being data-starved at 191 training images -- correctly. But a PER-CELL sequence model is a
+different object: 15,715 cells x ~160 months is ~2.5M cell-months. It was never built. That is the
+most plausible explanation for a five-submission entrant at 0.65 and the first thing to try with more
+time. It was not started today because half a sequence model is worth nothing and the entrant had one
+submission left.
+
+## The two blocks that did work, both adding information rather than fitting the board
+    gpcc  | Avn2 -0.0014 Bvn2 -0.0014 Cvn2 -0.0039 D -0.0026 E -0.0007 | wins 5/5 | mean -0.0020
+    wgap  | Cvn2 -0.0025 D -0.0052 E -0.0042                           | wins 3/3 | mean -0.0040
+GPCC is rain gauges where every previous precipitation was reanalysis (corr 0.597 with ERA5 at the
+cell). WaterGAP is a forward hydrological model's groundwater and surface-water storage, which the
+feature set had never represented (corr 0.436 with ERA5 modelled storage). Both encoded through §3.1's
+per-cell anomaly path. WaterGAP ran on three layouts, not five: the machine was needed for the final
+build, a trade recorded rather than hidden.
+
+## And one piece of our own pipeline that was costing score
+    ab_nh drop horizon-mix   D -0.0012  E -0.0001  mean -0.0007
+    ab_nw drop recency ramp  D +0.0000  E +0.0000  mean +0.0000
+    ab_nb drop both          D -0.0012  E -0.0001  mean -0.0007
+Dropping both equals dropping the horizon mix alone on both layouts, and the ramp is exactly zero on
+both. HMIX reweights training toward the test's horizon mix, and the validation layouts reproduce that
+mix by construction, so it looked free there. Adopted (it never hurts) and reported at its true size:
+a rounding error against the 0.026 gap to tenth place.
+
+Final configuration: XF=gpcc,wgap, DROPF=bigsa,gdo, WEIGHTS=ramp, HMIX unset, rounds 410/230, shipped
+smoothing, then the AR correction re-fitted against these models, then a mix with the record.
