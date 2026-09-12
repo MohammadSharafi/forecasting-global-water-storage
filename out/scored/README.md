@@ -18,3 +18,4 @@ Copied 2026-09-09 before rebuilding with the ERA5 soil profile and GDO SPI.
 | sub_y_lb.csv | **0.681717090** | L1<=4 refit. Predicted 0.676475 -- the oracle over-shot by 0.0052, transfer only 28% |
 | probe_clim.csv | 1.279955747 | pure climatology probe; a dimension, not a model |
 | sub_z_lb.csv | **0.681692450** | L1<=2 refit over 19 files. Predicted 0.677391; transfer 0.6% -- the oracle is exhausted |
+| sub_goal065.csv | **0.68284693** | sub_x_lb2 + the marginal AR correction. -0.000865 against its base, an 18% transfer of -0.0048 validation. Built on the private-safer base, so it does not beat sub_z_lb's display |

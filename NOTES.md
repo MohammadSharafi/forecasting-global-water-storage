@@ -3115,3 +3115,35 @@ about 0.6797-0.6835, most likely ~0.680 -- better than the displayed 0.681692, a
 G2 asked for a change set winning 5/5 with a mean <= -0.041. The adopted set wins 5/5 at -0.0048,
 which is 8.5x too small. Nothing measured in this goal came close, and RESEARCH.md's BUDGET TOTAL
 of 0.0000 said so before the measuring started. The threshold was never moved.
+
+## Session 12 outcome — the board answered
+    sub_goal065   0.68284693
+
+Inside the predicted 0.679728-0.683472, near its pessimistic end. Against its own base
+(sub_x_lb2, 0.683712087) the correction gained **-0.000865**, a realised transfer of **18%** of its
+-0.0048 validation gain -- not the 0.77-0.83 that structural changes have managed, and not the 5%
+of the encoding fix either. Another point for the transfer table, and another reminder that the
+ratio is not a constant.
+
+**A claim of mine that was wrong.** I said the file "should beat your displayed best". It did not:
+0.682847 against sub_z_lb's 0.681692 is +0.001155 WORSE. The correction worked; the base it was
+put on was 0.002 behind, and 0.002 > 0.00087. Choosing the private-safer base cost the display, and
+that trade was stated in advance, but the prediction that it would still win was simply wrong.
+
+## What the new score unlocks
+sub_ac_armarg.csv (the same correction on sub_z_lb instead) is EXACTLY
+sub_goal065 + sub_z_lb - sub_x_lb2 -- verified to max|diff| 8.9e-16 -- and all three of those are
+now scored. The affine identity therefore gives its public score without submitting it:
+
+    implied public score of sub_ac_armarg = 0.679683   (-0.002009 vs the displayed best)
+
+Confidence is high here in a way it was NOT for the session-11 blends. Those had weights chosen BY
+an optimiser, which is what let them exploit the difference between D2 over all rows and D2 over the
+public 30%, and their misses grew with the search freedom (+0.00047 at ||w||_1=2, +0.0052 at 4).
+These weights are (1, 1, -1), fixed by algebra for a file that already existed, with no optimisation
+at all. The one previous NON-optimised prediction of this kind, sub_blend55, came out at 0.693726
+against an actual 0.693725.
+
+So the standing choice is now explicit:
+  * best displayed:  sub_ac_armarg.csv, implied 0.6797, built on a base whose edge was 99% public-specific
+  * safest private:  sub_goal065.csv, measured 0.682847, built on a base whose edge was 5% public-specific
