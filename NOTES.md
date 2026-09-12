@@ -3222,3 +3222,33 @@ horizons were still teaching it something it needs. The dead-feature count was r
 binding constraint. What remains is the structural reading: at h=1 t_known == t, so there is no
 forcing gap to exploit, and the rain that would explain t+1 falls DURING t+1, which is prohibited.
 Less to know, not less well modelled.
+
+## Session 12 — the GPCC submission, built and priced
+Twelve FINAL models (six LightGBM at 410 rounds, six XGBoost at 230) trained on FINALvn2 with
+XF=gpcc, the shipped configuration otherwise, assembled with the shipped smoothing (0.7/r1/it1).
+Provenance checked rather than assumed: every run reports 355 features against the control's 340.
+
+The AR correction was then applied in the form it was validated in, and re-measured at build time
+rather than quoted:
+
+    Avn2 0.6318 -> 0.6224  -0.0093     D 0.4934 -> 0.4928  -0.0007
+    Bvn2 0.5239 -> 0.5153  -0.0086     E 0.4759 -> 0.4684  -0.0075
+    Cvn2 0.5137 -> 0.5074  -0.0062     mean -0.0065, wins 5/5
+    w4 = [0.9994, -0.3494, -0.1192, 0.4693]
+
+Note the form: here the base IS the model the weights were fitted against, so the file is the fitted
+combination itself. In goal065_build.py the base was a blend fitted against a DIFFERENT model, so
+only the marginal term could be added. Using the marginal form here would double-count persistence
+and climatology.
+
+    out/sub_gpcc_base.csv   the GPCC model, smoothed
+    out/sub_gpcc_ar.csv     the same plus the AR correction   <- the one to submit
+
+Expected board 0.688789-0.690659, i.e. +0.0090 to +0.0109 WORSE than the 0.679786 record. That is
+the whole point of it and it is stated rather than buried: the record is a blend fitted to the
+public board, and 99% of sub_z_lb's incremental public gain was public-specific. This file has no
+board-fitted component in it at all. On the public display it loses; on the private 70%, which
+decides the standing, the ordering may be the other way round.
+
+Caveats: six seeds per family rather than sixteen, and no horizon-1 splice (worth -0.0005), so it is
+a slightly weaker build than the shipped recipe.
