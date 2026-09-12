@@ -3045,3 +3045,40 @@ ceiling called here has been broken by a REPRESENTATION failure rather than by n
 raw millimetres instead of per-cell anomalies, the anomaly block existing only at 1 degree, never
 using our own public scores. "No information left" has been the wrong frame three times and should
 not be asserted again.
+
+# Session 12 — goal 0.65
+
+The entrant set a hard goal: public RMSE below 0.65, legally, without hurting the private 70%.
+From 0.681692 that is a board gain of 0.0317. Run under the unlazy discipline: acceptance gates
+written to GATES.md and gates/*.md BEFORE any work, one owner per file, one training process at a
+time, and every candidate measured control-vs-treatment on the five layouts that carry the shipped
+340-feature set (Avn2, Bvn2, Cvn2, D, E), leave-one-layout-out where weights are fitted.
+
+## The adoption arithmetic, fixed in advance
+Structural changes have transferred to the board at 0.77-0.83 of their validation size, and changes
+under ~0.003 have flipped sign. So a candidate reaches 0.65 only if its mean held-out gain is
+<= -0.041, it wins 5/5, and every layout clears -0.003. That threshold was never moved.
+
+## Research (RESEARCH.md, 8 candidates)
+    BUDGET TOTAL: 0.0000
+Every expected board gain rounds to zero against the 0.0317 needed. The most generous reading --
+crediting every validation estimate at 0.77 regardless of size and letting the gains add -- is
+0.0061, under a fifth of the requirement; adding the AR marginal correction still only reaches
+0.0098. The gains also overlap (c5 and c6 both add groundwater; c1, c7, c8 all refine the same
+forcing), so the naive sum is an upper bound, not an expectation.
+
+## Two defects found in the tooling, recorded because they cost real time
+  * SampleSubmission.csv in this repo belongs to a DIFFERENT competition: 9378 rows x 17 columns
+    keyed on GEOID (coverage_gap_score, region, transport_gap, ...). Any valid submission for this
+    challenge (ID,Target, 280961 rows) makes gate G4's check print "bad" by construction. G4 was
+    NOT edited; it carries an ABANDON line with this reason, and the substantive equivalent is
+    leaf-1.3.1 B5, which checks the file against Test.csv.
+  * gate-check.mjs drops its FIRST file argument unless --timeout is passed: `fileArgs` filters on
+    `i !== tIdx + 1`, and with no --timeout flag tIdx is -1, so index 0 is removed and the tool
+    falls back to checking every gates file. Pointing it at one leaf therefore ran the whole
+    ledger, including the compliance audit, and ticked G3 before any final artefact existed. Those
+    ticks were reverted and every later call passes --timeout first. The skill's script was left
+    unmodified; the bug is reported to the user.
+  * Two gate regexes written here anchored with `$` against command output that ends in a newline,
+    so they could never match whatever the content. Fixed to `\s*$`; the required content of the
+    line was not changed and the thresholds were not touched.

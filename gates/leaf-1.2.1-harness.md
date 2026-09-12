@@ -27,15 +27,15 @@ Scope: goal065_eval.py (scoring + verdict + summary line), goal065_run.sh (seque
   EXPECT: refs=0
   EVIDENCE: refs=0
 
-- [ ] H6: XF switch is additive: with XF unset the shipped feature list is unchanged (340)
+- [x] H6: XF switch is additive: with XF unset the shipped feature list is unchanged (340)
   CHECK: FEATS_ONLY=1 DROPF=bigsa,gdo WEIGHTS=ramp HMIX=test PER_ROW=2 ./.venv/bin/python run_models.py D lgb v5x_noll_sa 2>&1 | grep "^FEATS_ONLY"
   EXPECT: /FEATS_ONLY D n=340\b/
-  EVIDENCE: pending
+  EVIDENCE: FEATS_ONLY D n=340
 
-- [ ] H7: XF appends exactly the side-car's columns (dummy 2-column side-car on D gives 342)
+- [x] H7: XF appends exactly the side-car's columns (dummy 2-column side-car on D gives 342)
   CHECK: FEATS_ONLY=1 XF=xftest DROPF=bigsa,gdo WEIGHTS=ramp HMIX=test PER_ROW=2 ./.venv/bin/python run_models.py D lgb v5x_noll_sa 2>&1 | grep "^FEATS_ONLY"
   EXPECT: /FEATS_ONLY D n=342\b/
-  EVIDENCE: pending
+  EVIDENCE: FEATS_ONLY D n=342
 
 - [ ] H8: XF unset stays bit-identical to the shipped control after the edit (one D seed retrained)
   CHECK: ./.venv/bin/python -c "import numpy as np;a=np.load('out/mats/pred_D_lgb_v5x_noll_s0_xfnull.npy');b=np.load('out/mats/pred_D_lgb_v5x_noll_s0_d0.npy');print('maxdiff=%.3e'%abs(a-b).max())"
