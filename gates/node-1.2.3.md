@@ -12,5 +12,5 @@ Scope: every RESEARCH.md candidate is either measured under the contract or expl
   EXPECT: ok
   EVIDENCE: pending
 
-- [ ] N3: candidates were measured in RESEARCH.md's recommended order, or PLAN.md logs why not (manual)
-  EVIDENCE: pending
+- [x] N3: candidates were measured in RESEARCH.md's recommended order, or PLAN.md logs why not (manual)
+  EVIDENCE: RESEARCH.md's recommended order is c1, c4, then c2/c3 (recommended NOT to train), then the downloads c5, c6, c7, c8. c1 was measured first, exactly as ranked. Everything after it is deferred with its number in PLAN.md step 6 (c2/c3 at +0.0000 on RESEARCH.md's own recommendation, c4 at -0.0003 because it needs matrices rebuilt on five layouts, c5-c8 because they need downloads the user has not approved). Nothing was reordered to favour a result.
