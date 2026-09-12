@@ -3172,3 +3172,27 @@ find the t that minimises it. That is fitting a weight on the public leaderboard
 own rules forbid and which is exactly the mechanism that made the session-11 blends evaporate on the
 private split. The correction is already at the magnitude ar_blend fitted on validation labels
 across five layouts (w4 = [1.0054, -0.3528, -0.118, 0.4654]). It stays there.
+
+## Session 12 continued — the post-hoc correction surface is exhausted
+The AR term pays because it is a(h,cell)*tws_known, a per-cell per-horizon rescaling the tree cannot
+build from splits. The obvious question is whether any OTHER quantity of that shape also pays. Eight
+were tried on top of the four-vector correction, leave-one-layout-out, validation labels only:
+
+    hunt2_sa300         Avn2 +0.0002 Bvn2 -0.0001 Cvn2 -0.0001 D -0.0000 E +0.0002  wins 3/5  mean +0.0000  REJECT
+    hunt2_sa800         Avn2 +0.0003 Bvn2 -0.0000 Cvn2 -0.0001 D +0.0002 E +0.0001  wins 2/5  mean +0.0001  REJECT
+    hunt2_both          Avn2 +0.0003 Bvn2 -0.0001 Cvn2 -0.0001 D +0.0002 E +0.0002  wins 2/5  mean +0.0001  REJECT
+    hunt3_anom_persist  Avn2 -0.0002 Bvn2 -0.0007 Cvn2 +0.0008 D -0.0007 E -0.0004  wins 4/5  mean -0.0002  REJECT
+    hunt3_trend_persist Avn2 -0.0003 Bvn2 -0.0005 Cvn2 +0.0026 D -0.0005 E -0.0000  wins 4/5  mean +0.0003  REJECT
+    hunt3_csd_k         Avn2 +0.0001 Bvn2 +0.0002 Cvn2 +0.0007 D +0.0000 E -0.0000  wins 1/5  mean +0.0002  REJECT
+    hunt3_k_over_h      Avn2 +0.0000 Bvn2 +0.0000 Cvn2 +0.0001 D -0.0001 E -0.0000  wins 2/5  mean -0.0000  REJECT
+    hunt3_anom_csd_k    Avn2 +0.0002 Bvn2 -0.0007 Cvn2 +0.0005 D -0.0010 E -0.0005  wins 3/5  mean -0.0003  REJECT
+
+The two that come closest, anom_persist (4/5, mean -0.0002) and the anom+csd_k pair (3/5, mean
+-0.0003), both break on Cvn2, and neither is within an order of magnitude of the AR term's -0.0048.
+The neighbourhood's last observation (sa300/sa800) adds nothing once the cell's OWN rescaled
+observation is present, which is consistent with §4's finding that the residual is spatially
+isotropic and already carried by the existing anchors.
+
+Twelve candidates have now been measured under this goal and every one was rejected. The AR anchor
+rescaling remains the only change in the project's history to win on all five layouts and hold at
+every shrinkage and budget setting tried.
