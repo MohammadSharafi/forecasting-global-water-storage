@@ -1,0 +1,274 @@
+import polars as pl, numpy as np, sys, time, gc, json, os
+from features2 import FEATS2
+from features4 import AR
+from features5 import WIDE
+from features6 import RECENT, LONGTERM
+
+from build_mats import base_of as layout_base
+L,M,FS=sys.argv[1:4]; R=int(sys.argv[4]) if len(sys.argv)>4 else None; t0=time.time()
+
+_TRK=None
+if os.environ.get("CARBON","0")=="1":
+    try:
+        from codecarbon import EmissionsTracker
+        os.makedirs("out/carbon",exist_ok=True)
+        _TRK=EmissionsTracker(project_name=f"{L}_{M}_{FS}{os.environ.get('TAG','')}_s{os.environ.get('SEED','0')}",
+                              output_dir="out/carbon",log_level="error",save_to_file=True)
+        _TRK.start()
+    except Exception as e:
+        print(f"  carbon: not measured ({type(e).__name__}: {e})",flush=True); _TRK=None
+def _carbon_stop():
+    if _TRK is None: return
+    try:
+        kg=_TRK.stop()
+        print(f"  carbon: {kg:.6g} kg CO2e for this run",flush=True)
+    except Exception as e:
+        print(f"  carbon: stop failed ({type(e).__name__})",flush=True)
+ALL=json.load(open((f"out/mats/feats_{L}.json" if os.path.exists(f"out/mats/feats_{L}.json") else "out/mats/feats.json")))
+F6=[f for f in FEATS2+AR+WIDE+RECENT if f not in LONGTERM]
+NCEP=[f for f in ALL if f.split("_")[0] in ("P","E","R","SWE","SW","PER")]
+NCEP2=[f for f in ALL if f.startswith("r2")]; CPC=[f for f in ALL if f.startswith("cpc")]
+ANOMF=[f for f in ALL if f.startswith("an_")]
+from features_scale import SCALE
+from features_x import WIDE4, COVWIN, RESP
+def _acols(path):
+    return pl.scan_parquet(path).collect_schema().names() if os.path.exists(path) else []
+SA=_acols(f"out/mats/{L}_tr_anchor.parquet")
+BIGSA=[c for c in SA if any(c.endswith(str(r)) for r in (1500,2500)) or c=="sa_grad2"]
+SA3=_acols(f"out/mats/{L}_tr_anchor3.parquet")
+USE_SA3=FS.endswith("_sa3") and os.path.exists(f"out/mats/{L}_tr_anchor3.parquet")
+if USE_SA3: FS=FS[:-4]
+SA2=_acols(f"out/mats/{L}_tr_anchor2.parquet")
+USE_SA2=FS.endswith("_sa2") and os.path.exists(f"out/mats/{L}_tr_anchor2.parquet")
+if USE_SA2: FS=FS[:-4]
+USE_SA=os.path.exists(f"out/mats/{L}_tr_anchor.parquet") and (FS.endswith("_sa") or USE_SA2 or USE_SA3)
+if FS.endswith("_sa"): FS=FS[:-3]
+
+DIRC=_acols(f"out/mats/{L}_tr_dir.parquet") if os.environ.get("DIRF")=="1" else []
+USE_DIR=bool(DIRC)
+
+ARC=_acols(f"out/mats/{L}_tr_ar.parquet") if os.environ.get("ARF")=="1" else []
+USE_AR=bool(ARC)
+
+XFN=[x for x in os.environ.get("XF","").split(",") if x]
+XFC=[]
+for _n in XFN:
+    _c=_acols(f"out/mats/{L}_tr_{_n}.parquet")
+    if not _c: raise SystemExit(f"XF={_n}: out/mats/{L}_tr_{_n}.parquet is missing or empty")
+    XFC+=_c
+USE_XF=bool(XFC)
+SETS={"v6n":F6+NCEP,"all":[f for f in ALL if f not in LONGTERM],"v5":FEATS2+AR+WIDE,"allx":[f for f in ALL if f not in LONGTERM and f not in NCEP2 and f not in CPC],
+      "v6nw":F6+NCEP+WIDE4+COVWIN+RESP,"v6nc":F6+NCEP+NCEP2+CPC,"v5x":[f for f in ALL if f not in RECENT],"v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon")],"e5only":[f for f in ALL if f not in LONGTERM and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_noll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x_noll":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"e5only_v5x":[f for f in ALL if f not in RECENT and not f.startswith("r2") and not f.startswith("cpc") and f.split("_")[0] not in ("P","E","R","SWE","SW","PER")],"noera":[f for f in ALL if f not in LONGTERM and not f.startswith("e5")],"allL_noll":[f for f in ALL if f not in ("lat","lon")],"allL":ALL,"allnoll":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon")],
+
+      "v5x_noll_noanom":[f for f in ALL if f not in RECENT and f not in ("lat","lon") and not f.startswith("an_")],
+      "allnoll_noanom":[f for f in ALL if f not in LONGTERM and f not in ("lat","lon") and not f.startswith("an_")]}
+F=SETS[FS]+(SA if USE_SA else [])+(SA2 if USE_SA2 else [])+(SA3 if USE_SA3 else [])+(DIRC if USE_DIR else [])+(ARC if USE_AR else [])+(XFC if USE_XF else [])
+
+DROPF=set(x for x in os.environ.get("DROPF","").split(",") if x)
+if "anom"  in DROPF: F=[f for f in F if not f.startswith("an_")]
+if "scale" in DROPF: F=[f for f in F if f not in SCALE]
+if "bigsa" in DROPF: F=[f for f in F if f not in BIGSA]
+if "gdospi" in DROPF:   F=[f for f in F if not (f.startswith("an_spi") and "z_" in f)]
+if "anwide" in DROPF:    F=[f for f in F if not f.startswith("aw_")]
+
+for _r in ("2","4","8","16"):
+    if "aw"+_r in DROPF: F=[f for f in F if not f.endswith("_r"+_r)]
+if "r2anom" in DROPF:   F=[f for f in F if not f.startswith("an_r2")]
+if "cpcanom" in DROPF:  F=[f for f in F if not f.startswith("an_cpc")]
+if "speianom" in DROPF: F=[f for f in F if not f.startswith("an_SPEI")]
+if "e5prof" in DROPF:
+
+    import re as _re
+    _p = _re.compile(r"^(an_)?e5SW[1-4](z)?_")
+    F=[f for f in F if not _p.match(f)]
+if "gdo"   in DROPF:
+
+    from features_gdo import PRODUCTS
+    F=[f for f in F if not any(f.startswith("an_"+p+"z") for p in PRODUCTS)]
+if DROPF: print(f"  dropped {sorted(DROPF)}: {len(F)} features remain",flush=True)
+AT=os.environ.get("ANCHOR_TARGET","tws"); RHO=float(os.environ.get("ANCHOR_RHO","0.85"))
+
+_LAM=None
+def _fit_lam(df):
+    y=df["target"].to_numpy().astype(np.float64); h=df["horizon"].to_numpy().astype(np.float64)
+    k=df["tws_known"].to_numpy().astype(np.float64)
+    c=df["clim_next"].to_numpy().astype(np.float64); c=np.where(np.isfinite(c),c,k)
+    ok=np.isfinite(y)&np.isfinite(k)&np.isfinite(c)
+    lam=np.ones(9)
+    for i in range(1,9):
+        m=ok&(h==i) if i<8 else ok&(h>=8)
+        if m.sum()<1000: lam[i]=lam[i-1] if i>1 else 1.0; continue
+        d=k[m]-c[m]; lam[i]=float(np.clip(np.dot(d,y[m]-c[m])/max(np.dot(d,d),1e-9),0.0,1.0))
+    return lam
+def base_of(df):
+    k=df["tws_known"].to_numpy().astype(np.float64)
+    if AT=="tws": return k
+    c=df["clim_next"].to_numpy().astype(np.float64); c=np.where(np.isfinite(c),c,k)
+    if AT=="clim": return c
+    if AT=="decay":
+        lam=RHO**df["horizon"].to_numpy().astype(np.float64); return lam*k+(1.0-lam)*c
+    if AT=="fit":
+        if _LAM is None: raise SystemExit("ANCHOR_TARGET=fit: lam not fitted yet")
+        lam=_LAM[np.clip(df["horizon"].to_numpy().astype(np.int64),1,8)]; return lam*k+(1.0-lam)*c
+    raise SystemExit(f"unknown ANCHOR_TARGET={AT}")
+
+if os.environ.get("FEATS_ONLY")=="1":
+
+    print(f"FEATS_ONLY {L} n={len(F)}",flush=True); sys.exit(0)
+_have=set(pl.scan_parquet(f"out/mats/{L}_tr.parquet").collect_schema().names())
+_miss=[f for f in F if f not in _have and f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC and f not in XFC]
+if _miss:
+    raise SystemExit(f"{L}_tr.parquet is STALE for featset {FS}: {len(_miss)} of {len(F)} features "
+                     f"are absent ({_miss[:5]}...). It has {len(_have)} columns. Rebuild it with "
+                     f"`python build_mats.py {L}`, or use a layout built with the current feature set.")
+tr=pl.read_parquet(f"out/mats/{L}_tr.parquet",columns=list(dict.fromkeys(["time","tws_known","target","clim_next","horizon","csd"]+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC and f not in XFC])))
+if USE_SA: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor.parquet"))
+if USE_SA2: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor2.parquet"))
+if USE_SA3: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_anchor3.parquet"))
+if USE_DIR: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_dir.parquet"))
+if USE_AR: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_ar.parquet"))
+if USE_XF:
+    for _n in XFN: tr=tr.hstack(pl.read_parquet(f"out/mats/{L}_tr_{_n}.parquet"))
+seed=int(os.environ.get("SEED","0")); SUB=float(os.environ.get("SUB","1.0"))
+
+HFILT=os.environ.get("HFILT","")
+HLO,HHI=(lambda a:(int(a[0]),int(a[-1])))(HFILT.split("-")) if HFILT else (0,99)
+if HFILT:
+    n0=len(tr); tr=tr.filter((pl.col("horizon")>=HLO)&(pl.col("horizon")<=HHI))
+    print(f"  HFILT={HFILT}: {len(tr)}/{n0} training rows kept",flush=True)
+if SUB<1.0: tr=tr.sample(fraction=SUB,seed=seed)
+
+if os.environ.get("DEADF","")=="1":
+    n0=len(tr)
+    st=tr.select([pl.col(f).is_finite().sum().alias(f"n{i}") for i,f in enumerate(F)]
+                +[pl.col(f).filter(pl.col(f).is_finite()).min().alias(f"lo{i}") for i,f in enumerate(F)]
+                +[pl.col(f).filter(pl.col(f).is_finite()).max().alias(f"hi{i}") for i,f in enumerate(F)]).row(0)
+    nF=len(F); keep=[f for i,f in enumerate(F)
+                     if st[i] and st[nF+i] is not None and st[nF+i]!=st[2*nF+i]]
+    if len(keep)<len(F):
+        print(f"  DEADF: dropped {len(F)-len(keep)} feature(s) constant on these {n0} rows"
+              f" -> {len(keep)} remain",flush=True)
+    F=keep
+if AT=="fit":
+    _LAM=_fit_lam(tr); print("  anchor lam(h) fitted on train: "+" ".join(f"{x:.3f}" for x in _LAM[1:]),flush=True)
+X=tr.select(F).to_numpy(); y=(tr["target"].to_numpy()-base_of(tr)).astype(np.float32)
+yr=tr["time"].dt.year().to_numpy(); w=np.clip((yr-yr.min()+1)/(yr.max()-yr.min()+1),0.3,1.0).astype(np.float32)
+if os.environ.get("WEIGHTS","ramp")=="uniform": w=np.ones_like(w)
+if "var" in os.environ.get("WEIGHTS","ramp").split(","):
+
+    _v = tr["csd"].to_numpy().astype(np.float64)
+    _v = np.where(np.isfinite(_v) & (_v > 0), _v, np.nanmedian(_v))
+    _v = _v / _v.mean()
+    print(f"  variance weighting: row weight {_v.min():.2f}..{_v.max():.2f}", flush=True)
+    w = (w * _v).astype(np.float32)
+if "analog" in os.environ.get("WEIGHTS","ramp"):
+
+    _oni = pl.read_parquet("external/oni.parquet")
+    _vt = pl.scan_parquet(f"out/mats/{L}_va.parquet").select("time").unique().collect()
+    _tgt = float(_vt.join(_oni, on="time", how="left")["oni"].mean())
+    _s = float(os.environ.get("ANALOG_S","0.75"))
+    _m = dict(zip(_oni["time"].to_list(), _oni["oni"].to_list()))
+    _o = np.array([_m.get(d, np.nan) for d in tr["time"].to_list()], dtype=np.float64)
+    _aw = np.exp(-np.abs(_o-_tgt)/_s); _aw = np.where(np.isfinite(_aw), _aw, 1.0); _aw /= _aw.mean()
+    print(f"  analog weighting: target ONI {_tgt:+.2f}, scale {_s}, "
+          f"row weight {_aw.min():.2f}..{_aw.max():.2f}",flush=True)
+    w = (w*_aw).astype(np.float32)
+if os.environ.get("HMIX","")=="test":
+
+    MIX={1:.3333,2:.2222,3:.1667,4:.1111,5:.0556,6:.0556,7:.0556}
+    hh=tr["horizon"].to_numpy()
+    freq={k:float((hh==k).mean()) for k in range(1,8)}
+    hw=np.array([MIX.get(int(x),0.0)/max(freq.get(int(x),1e-9),1e-9) for x in hh],dtype=np.float32)
+    hw/=hw.mean(); w=(w*hw).astype(np.float32)
+    print(f"  HMIX=test: train horizon freq {[round(freq[k],3) for k in range(1,8)]}"
+          f" -> weight range {hw.min():.2f}..{hw.max():.2f}",flush=True)
+del tr; gc.collect()
+va=pl.read_parquet(f"out/mats/{L}_va.parquet",columns=list(dict.fromkeys(["tws_known","clim_next","horizon"]+(["target"] if layout_base(L)!="FINAL" else [])+[f for f in F if f not in SA and f not in SA2 and f not in SA3 and f not in DIRC and f not in ARC and f not in XFC])))
+if USE_SA: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor.parquet"))
+if USE_SA2: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor2.parquet"))
+if USE_SA3: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_anchor3.parquet"))
+if USE_DIR: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_dir.parquet"))
+if USE_AR: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_ar.parquet"))
+if USE_XF:
+    for _n in XFN: va=va.hstack(pl.read_parquet(f"out/mats/{L}_va_{_n}.parquet"))
+Xv=va.select(F).to_numpy(); kv=base_of(va); yv=va["target"].to_numpy() if layout_base(L)!="FINAL" else None
+
+hv=va["horizon"].to_numpy(); VM=(hv>=HLO)&(hv<=HHI) if HFILT else None
+del va; gc.collect()
+if AT!="tws": print(f"  anchor target: {AT}" + (f" rho={RHO}" if AT=="decay" else "") + f", base mean {kv.mean():+.4f}",flush=True)
+print(f"{L} {M} {FS}: X {X.shape} Xv {Xv.shape} ({time.time()-t0:.0f}s)",flush=True)
+seed=int(os.environ.get("SEED","0"))
+def report(p,tag=""):
+    if yv is None: return
+    h=None
+    print(f"  {tag} RMSE={np.sqrt(np.mean((yv-p)**2)):.4f} bias={np.mean(p-yv):+.4f} ({time.time()-t0:.0f}s)",flush=True)
+if M in ("lgb","lgbd","lgbs","lgbm"):
+    import lightgbm as lgb
+    P=dict(objective="regression",learning_rate=0.02,num_leaves=127,min_data_in_leaf=500,feature_fraction=0.6,bagging_fraction=0.8,bagging_freq=1,lambda_l2=5.0,verbose=-1,num_threads=8,max_bin=63,seed=seed)
+    if M=="lgbd": P.update(num_leaves=255,min_data_in_leaf=300,learning_rate=0.01,feature_fraction=0.5)
+
+    if M=="lgbm": P.update(num_leaves=63,min_data_in_leaf=1000,feature_fraction=0.5,lambda_l2=10.0)
+    if M=="lgbs": P.update(num_leaves=31,min_data_in_leaf=2000,feature_fraction=0.4,lambda_l2=20.0)
+
+    for _e,_k,_f in (("LEAVES","num_leaves",int),("MINDATA","min_data_in_leaf",int),("LR","learning_rate",float)):
+        if os.environ.get(_e): P[_k]=_f(os.environ[_e])
+    ds=lgb.Dataset(X,y,weight=w,free_raw_data=True,params={"max_bin":63}); ds.construct(); del X; gc.collect()
+    if yv is not None and R is None:
+        ev=lgb.Dataset(Xv if VM is None else Xv[VM],(yv-kv) if VM is None else (yv-kv)[VM],reference=ds)
+        m=lgb.train(P,ds,num_boost_round=6000,valid_sets=[ev],callbacks=[lgb.early_stopping(200,verbose=False)])
+        p=m.predict(Xv,num_iteration=m.best_iteration)+kv; report(p,f"best_iter={m.best_iteration}")
+        g=dict(zip(F,m.feature_importance("gain"))); tot=sum(g.values()); print("   top gain:",[(f,round(100*g[f]/tot,1)) for f in sorted(F,key=lambda f:-g[f])[:15]])
+    else:
+        m=lgb.train(P,ds,num_boost_round=R); p=m.predict(Xv)+kv; report(p,f"rounds={R}"); m.save_model(f"out/mats/model_{L}_{M}_{FS}_s{seed}.txt")
+elif M=="xgb":
+    import xgboost as xgb
+    P=dict(objective="reg:squarederror",eta=0.03,max_depth=9,min_child_weight=200,subsample=0.8,colsample_bytree=0.6,reg_lambda=5.0,tree_method="hist",max_bin=63,nthread=8,seed=seed)
+
+    for _e,_k,_f in (("DEPTH","max_depth",int),("MINCHILD","min_child_weight",int),("ETA","eta",float)):
+        if os.environ.get(_e): P[_k]=_f(os.environ[_e])
+    d=xgb.DMatrix(X,y,weight=w,nthread=8); del X; gc.collect(); dv=xgb.DMatrix(Xv,(yv-kv) if yv is not None else None,nthread=8)
+    if yv is not None and R is None:
+        de=dv if VM is None else xgb.DMatrix(Xv[VM],(yv-kv)[VM],nthread=8)
+        m=xgb.train(P,d,6000,evals=[(de,"va")],early_stopping_rounds=200,verbose_eval=False)
+        p=m.predict(dv,iteration_range=(0,m.best_iteration+1))+kv; report(p,f"best_iter={m.best_iteration}")
+    else:
+        m=xgb.train(P,d,R); p=m.predict(dv)+kv; report(p,f"rounds={R}"); m.save_model(f"out/mats/model_{L}_{M}_{FS}_s{seed}.json")
+elif M=="cat":
+    from catboost import CatBoostRegressor, Pool
+    m=CatBoostRegressor(iterations=R or 6000,learning_rate=float(os.environ.get("CATLR","0.03")),depth=8,l2_leaf_reg=5,loss_function="RMSE",thread_count=8,random_seed=seed,border_count=64,verbose=0,od_type="Iter" if R is None else None,od_wait=200 if R is None else None)
+    pool=Pool(X,y,weight=w); del X; gc.collect()
+    if yv is not None and R is None: m.fit(pool,eval_set=Pool(Xv,yv-kv),use_best_model=True); p=m.predict(Xv)+kv; report(p,f"best_iter={m.get_best_iteration()}")
+    else: m.fit(pool); p=m.predict(Xv)+kv; report(p,f"rounds={R}"); m.save_model(f"out/mats/model_{L}_{M}_{FS}_s{seed}.cbm")
+elif M=="mlp":
+    import torch, torch.nn as nn
+    torch.manual_seed(seed); np.random.seed(seed)
+    med=np.nanmedian(X,axis=0); X=np.where(np.isnan(X),med,X); Xv=np.where(np.isnan(Xv),med,Xv)
+    mu=X.mean(0); sd=X.std(0)+1e-6; X=np.clip((X-mu)/sd,-6,6).astype(np.float32); Xv=np.clip((Xv-mu)/sd,-6,6).astype(np.float32)
+    ysd=float(y.std()); dev=torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    W=int(os.environ.get("WIDTH","256")); DO=float(os.environ.get("DROP","0.3")); WD=float(os.environ.get("WD","1e-3")); LR=float(os.environ.get("LR","1e-3"))
+    net=nn.Sequential(nn.Linear(X.shape[1],W),nn.SiLU(),nn.Dropout(DO),nn.Linear(W,W),nn.SiLU(),nn.Dropout(DO),nn.Linear(W,W//2),nn.SiLU(),nn.Dropout(DO),nn.Linear(W//2,1)).to(dev)
+    EP=int(os.environ.get("EPOCHS","3")); BS=4096; n=len(X); steps=EP*((n+BS-1)//BS)
+    opt=torch.optim.AdamW(net.parameters(),lr=LR,weight_decay=WD); sch=torch.optim.lr_scheduler.OneCycleLR(opt,max_lr=LR,total_steps=steps,pct_start=0.15)
+    Xt=torch.from_numpy(X); yt=torch.from_numpy(y/ysd); wt=torch.from_numpy(w); Xvt=torch.from_numpy(Xv).to(dev)
+    def predict():
+        net.eval(); out=[]
+        with torch.no_grad():
+            for i in range(0,len(Xvt),65536): out.append(net(Xvt[i:i+65536]).squeeze(1).float().cpu().numpy())
+        net.train(); return np.concatenate(out)*ysd+kv
+    best=9; pbest=None
+    for ep in range(EP):
+        perm=torch.randperm(n); tl=0.0
+        for i in range(0,n,BS):
+            idx=perm[i:i+BS]; xb=Xt[idx].to(dev); yb=yt[idx].to(dev); wb=wt[idx].to(dev)
+            loss=(wb*(net(xb).squeeze(1)-yb)**2).sum()/wb.sum(); opt.zero_grad(); loss.backward(); opt.step(); sch.step(); tl+=loss.item()*len(idx)
+        p=predict(); report(p,f"epoch {ep+1} train_loss={tl/n:.4f}")
+        if yv is not None and (ep==0 or np.sqrt(np.mean((yv-p)**2))<best): best=float(np.sqrt(np.mean((yv-p)**2))); pbest=p.copy()
+    if yv is not None: p=pbest
+    torch.save({"state":net.state_dict(),"mu":mu,"sd":sd,"med":med,"ysd":ysd,"F":F},f"out/mats/model_{L}_{M}_{FS}_s{seed}.pt")
+
+json.dump({"layout":L,"model":M,"featset":FS,"tag":os.environ.get("TAG",""),"dropf":sorted(DROPF),
+           "anchor_target":AT,"weights":os.environ.get("WEIGHTS","ramp"),"hmix":os.environ.get("HMIX",""),
+           "hfilt":HFILT,"n_features":len(F),"features":F},
+          open(f"out/mats/used_{L}_{M}_{FS}{os.environ.get('TAG','')}.json","w"))
+np.save(f"out/mats/pred_{L}_{M}_{FS}_s{seed}{os.environ.get('TAG','')}.npy",p); print("saved",flush=True)
+_carbon_stop()

@@ -1,0 +1,28 @@
+import polars as pl, numpy as np, lightgbm as lgb, time
+from features import *
+t0=time.time()
+tr=pl.read_csv("Train.csv").with_columns(pl.col("time").str.to_date())
+te_pseudo=pl.read_parquet("out/pseudo_test.parquet"); hist=pl.read_parquet("out/pseudo_hist.parquet")
+cov_all=tr.select(["lat","lon","time"]+COV)
+obs_hist=hist.select(["lat","lon","time","TWS_t"])
+obs_val=pl.concat([obs_hist, te_pseudo.filter(~pl.col("masked")).select(["lat","lon","time","TWS_t"])])
+clim,cell=cell_stats(hist)
+rng=np.random.default_rng(0)
+rows=training_rows(hist,rng,per_row=2)
+Xtr=assemble(rows,cov_all,obs_hist,clim,cell)
+Xva=assemble(te_pseudo.select(["lat","lon","time","t_known","target","horizon"]).drop("horizon"),cov_all,obs_val,clim,cell)
+print(f"train rows={len(Xtr)}  val rows={len(Xva)}  built in {time.time()-t0:.0f}s"); t0=time.time()
+def XY(d): return d.select(FEATS).to_numpy().astype(np.float32), d["target"].to_numpy().astype(np.float32)
+X,y=XY(Xtr); Xv,yv=XY(Xva)
+params=dict(objective="regression",learning_rate=0.05,num_leaves=127,min_data_in_leaf=200,feature_fraction=0.8,bagging_fraction=0.8,bagging_freq=1,lambda_l2=1.0,verbose=-1,num_threads=8)
+ds=lgb.Dataset(X,y,feature_name=FEATS); dv=lgb.Dataset(Xv,yv,reference=ds)
+m=lgb.train(params,ds,num_boost_round=3000,valid_sets=[dv],callbacks=[lgb.early_stopping(100,verbose=False),lgb.log_evaluation(200)])
+p=m.predict(Xv,num_iteration=m.best_iteration)
+r=lambda a: float(np.sqrt(np.nanmean((yv-a)**2)))
+print(f"\nVAL RMSE  lightgbm={r(p):.4f}   persistence={r(Xva['tws_known'].to_numpy()):.4f}   best_iter={m.best_iteration}  ({time.time()-t0:.0f}s)")
+h=Xva["horizon"].to_numpy(); tk=Xva["tws_known"].to_numpy()
+for hh in range(1,8):
+    k=h==hh; print(f"  h={hh} n={k.sum():>6}  lgb={r(np.where(k,p,np.nan)):.4f}  persist={r(np.where(k,tk,np.nan)):.4f}")
+imp=sorted(zip(m.feature_importance("gain"),FEATS),reverse=True)[:15]
+print("\ntop gain features:", [(f,int(g/1e3)) for g,f in imp])
+m.save_model("out/lgb_val.txt")

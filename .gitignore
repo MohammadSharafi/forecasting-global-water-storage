@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+out/
+external/
+catboost_info/
+Train.csv
+Test.csv
+SampleSubmission.csv
+.DS_Store
