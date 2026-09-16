@@ -1508,3 +1508,59 @@ smarter transform of the released columns -- four independent attempts at one fo
 but a forcing field the model has never seen. Which is exactly what ERA5 is (session 10a).
 Caveat: four families is suggestive of saturation, not proof of it, and all four were tested in
 the 40-feature harness rather than on top of the pipeline's 201.
+
+# Session 10b -- finishing REPORT.md, and what filling it in exposed
+
+All seven `[pending]` markers are filled from artifacts in `out/`. Filling them turned up five
+claims in the report that no artifact supported, all of them survivors from an earlier, global-grid
+version of this problem that were never re-measured after the domain became a 40x40 box over
+tropical South America. They are corrected in place, and the two that changed a conclusion are
+marked as corrections in the report itself rather than quietly rewritten.
+
+**What was wrong**
+
+| claim in the report | what the artifacts say |
+|---|---|
+| 15,715 one-degree land cells | 1,600 cells, 28,800 test rows |
+| "per-cell climatology is not competitive" | climatology 0.502 against persistence 1.166 -- it wins by more than 2x |
+| residual neighbour correlation +0.967 at lag 1, +0.899 at lag 2 | +0.55/+0.39/+0.52 and +0.41/+0.29/+0.39 across layouts A/B/C |
+| bands from -30S to 66.5N, "tropics and northern mid-latitudes carry 24% and 31% of MSE" | two bands exist; they carry 50.2% and 49.8% |
+| "worse than persistence on 38-45% of rows at every horizon" | 20.8% at h=1 falling to 6.6% at h=7 |
+| "the steadiest decile does not beat persistence (0.2305 vs 0.2301)" | 0.314 against 0.930 -- it beats it in every decile |
+| "regional drought signals outrank a cell's own history" | the reverse: climatology + own TWS = 66.6% of attribution, first anchor at rank 6, SPEI 1.4% |
+
+The last one was refuted by building the measurement that was supposed to back it.
+
+**shap_report.py** computes exact TreeSHAP from the FINAL boosters via LightGBM's own
+`pred_contrib`, so it needs no extra dependency and cannot drift from the model it explains. The
+boosters were trained from numpy arrays and carry `Column_0..Column_200`, so the feature ORDER
+comes from `out/mats/used_A_lgb_v5x_noll_bw.json` -- the file `run_models.py` writes beside them --
+and the script asserts the count matches and that `lat`/`lon` are absent.
+
+Three results worth keeping:
+
+  * attribution is dominated by climatology (43.5%) and the cell's own TWS history (23.1%). The
+    smoothed anchors take 13.0%, the covariate anomalies of session 9 take 4.1%, and NCEP/CPC take
+    0.3%. The model is an anomaly-persistence baseline that the rest adjusts -- consistent with
+    anomaly persistence alone reaching 0.407 against the pipeline's 0.334.
+  * **soil moisture, not SPEI, is the covariate that carries information**: 10.5% against 1.4% in
+    all forms, and `w_SOIL_MOISTURE_t_d` is the top-ranked covariate feature of any kind.
+  * the h=1 collapse of the window features is now quantified: the `_d`/`_acc` family takes 9.3% of
+    attribution at h>=2 and 1.8% at h=1. Note that only 5 of 201 features receive literally zero
+    SHAP at h=1 -- a constant feature still carries attribution relative to the background -- so the
+    earlier "38 dead features" framing is right about the mechanism and wrong about the signature.
+
+**A file-provenance problem, recorded because it would mislead anyone reproducing this.** The four
+`out/sub_q_*.csv` files now in the tree are byte-identical across `main`, `main_nocal` and
+`main_nosm` (RMS difference 0.000000), because a later pass regenerated them with smoothing
+rejected by its own scan and calibration unapplied. They cannot be the files that scored 0.696326,
+0.695965 and 0.699149. The configuration that produced the submitted files is the one recorded in
+`out/config.sh`, `out/stack.sh`, `out/blendw.sh` and `out/rounds.sh`, and REPORT.md section 8 now
+says so explicitly.
+
+**The smoothing disagreement is left standing, not reconciled.** `smooth_scan` rejected the
+incumbent and chose no smoothing at all; the leaderboard had already paid 0.0028 for keeping it.
+The same held-out machinery chose the stack correctly by two orders of magnitude more than its
+threshold. The honest reading is that a post-processing gain of 0.003 or less is at the edge of
+what three layouts from a milder era can resolve about this test window, which is the 2.1x caveat
+showing up in the one place where it changes a decision.
